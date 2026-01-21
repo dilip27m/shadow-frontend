@@ -6,6 +6,8 @@ import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
 
+console.log('🚀 Timetable Editor - CODE UPDATED v2');
+
 export default function TimetableEditor() {
     const router = useRouter();
     const notify = useNotification();
@@ -107,12 +109,21 @@ export default function TimetableEditor() {
     };
 
     const saveTimetable = async () => {
+        // Debug logging
+        console.log('🔍 Saving timetable...');
+        console.log('📋 ClassId:', classId);
+        console.log('🔑 Token exists:', !!localStorage.getItem('token'));
+        console.log('📅 Timetable data:', timetable);
+
         try {
             await api.put('/class/update-timetable', { classId, timetable });
             notify({ message: "Timetable Saved Successfully! 💾", type: 'success' });
             router.push('/admin/dashboard');
         } catch (err) {
-            notify({ message: "Failed to save.", type: 'error' });
+            console.error('❌ Save failed:', err.response?.data || err.message);
+            console.error('📊 Full error:', err);
+            const errorMsg = err.response?.data?.error || "Failed to save. Check console for details.";
+            notify({ message: errorMsg, type: 'error' });
         }
     };
 
@@ -161,8 +172,8 @@ export default function TimetableEditor() {
                                 }
                             }}
                             className={`px-4 py-2 rounded-full font-medium transition text-sm flex items-center gap-2 ${isManageMode
-                                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                    : 'bg-[var(--card-bg)] border border-[var(--border)] hover:border-white/50'
+                                ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                : 'bg-[var(--card-bg)] border border-[var(--border)] hover:border-white/50'
                                 }`}
                         >
                             <Edit2 className="w-4 h-4" />
@@ -176,8 +187,8 @@ export default function TimetableEditor() {
                             <div
                                 key={sub._id}
                                 className={`flex items-center justify-between px-4 py-3 rounded-full text-sm font-medium transition ${isManageMode
-                                        ? 'bg-blue-900/20 text-blue-400 border border-blue-500/30'
-                                        : 'bg-[#1a1a1a] text-gray-300 border border-white/5'
+                                    ? 'bg-blue-900/20 text-blue-400 border border-blue-500/30'
+                                    : 'bg-[#1a1a1a] text-gray-300 border border-white/5'
                                     }`}
                             >
                                 {isManageMode ? (

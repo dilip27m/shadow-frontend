@@ -120,15 +120,26 @@ export default function TimetableEditor() {
         });
     };
 
-    const saveTimetable = async () => {
-        try {
-            await api.put('/class/update-timetable', { classId, timetable });
-            notify({ message: "Timetable Saved!", type: 'success' });
-            router.push('/admin/dashboard');
-        } catch (err) {
-            notify({ message: "Failed to save.", type: 'error' });
-        }
-    };
+const saveTimetable = async () => {
+    // Debug logging
+    console.log('🔍 Saving timetable...');
+    console.log('📋 ClassId:', classId);
+    console.log('🔑 Token exists:', !!localStorage.getItem('token'));
+    console.log('📅 Timetable data:', timetable);
+    
+    try {
+        console.log('⚡ About to call API PUT...');  // ← ADD THIS
+        const response = await api.put('/class/update-timetable', { classId, timetable });
+        console.log('✅ API Response:', response.data);  // ← ADD THIS
+        notify({ message: "Timetable Saved!", type: 'success' });
+        router.push('/admin/dashboard');
+    } catch (err) {
+        console.error('❌ Save failed:', err.response?.data || err.message);
+        console.error('📊 Full error:', err);
+        const errorMsg = err.response?.data?.error || "Failed to save. Check console for details.";
+        notify({ message: errorMsg, type: 'error' });
+    }
+};
 
     if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
 
@@ -169,8 +180,8 @@ export default function TimetableEditor() {
                                 }
                             }}
                             className={`px-4 py-2 rounded-full font-medium transition text-sm flex items-center gap-2 ${editingSubject === 'edit-mode'
-                                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                    : 'bg-[var(--card-bg)] border border-[var(--border)] hover:border-white/50'
+                                ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                : 'bg-[var(--card-bg)] border border-[var(--border)] hover:border-white/50'
                                 }`}
                         >
                             <Edit2 className="w-4 h-4" />
@@ -187,8 +198,8 @@ export default function TimetableEditor() {
                                 <div
                                     key={sub._id}
                                     className={`flex items-center justify-between px-4 py-3 rounded-full text-sm font-medium transition ${editingSubject === 'edit-mode'
-                                            ? 'bg-blue-900/20 text-blue-400 border border-blue-500/30'
-                                            : 'bg-[#1a1a1a] text-gray-300 border border-white/5'
+                                        ? 'bg-blue-900/20 text-blue-400 border border-blue-500/30'
+                                        : 'bg-[#1a1a1a] text-gray-300 border border-white/5'
                                         }`}
                                 >
                                     {editingSubject === 'edit-mode' ? (

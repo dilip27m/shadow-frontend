@@ -14,7 +14,6 @@ export default function AdminSettings() {
 
     // Settings state
     const [minPercentage, setMinPercentage] = useState(75);
-    const [permanentAbsentees, setPermanentAbsentees] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -31,7 +30,6 @@ export default function AdminSettings() {
                 setClassName(res.data.className);
                 if (res.data.settings) {
                     setMinPercentage(res.data.settings.minAttendancePercentage || 75);
-                    setPermanentAbsentees((res.data.settings.permanentAbsentees || []).join(', '));
                 }
                 setLoading(false);
             })
@@ -49,15 +47,8 @@ export default function AdminSettings() {
     const handleSave = async () => {
         setSaving(true);
 
-        // Parse permanent absentees
-        const absenteesArray = permanentAbsentees
-            .split(',')
-            .map(num => parseInt(num.trim()))
-            .filter(num => !isNaN(num) && num > 0);
-
         const settings = {
-            minAttendancePercentage: minPercentage,
-            permanentAbsentees: absenteesArray
+            minAttendancePercentage: minPercentage
         };
 
         try {
@@ -102,25 +93,6 @@ export default function AdminSettings() {
                         />
                         <span className="text-2xl font-bold text-blue-400 min-w-[60px]">{minPercentage}%</span>
                     </div>
-                </div>
-
-                {/* Permanent Absentees */}
-                <div className="card mb-4">
-                    <h2 className="text-sm uppercase text-[var(--text-dim)] mb-3">Permanent Absentees</h2>
-                    <p className="text-sm text-[var(--text-dim)] mb-3">
-                        Roll numbers of students who are permanently absent (e.g., dropouts, transfers).
-                        These students will be automatically marked absent in all periods.
-                    </p>
-                    <input
-                        type="text"
-                        className="input"
-                        placeholder="e.g., 5, 12, 23"
-                        value={permanentAbsentees}
-                        onChange={(e) => setPermanentAbsentees(e.target.value)}
-                    />
-                    <p className="text-xs text-[var(--text-dim)] mt-2">
-                        Enter roll numbers separated by commas
-                    </p>
                 </div>
 
                 {/* Save Button */}

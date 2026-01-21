@@ -37,7 +37,7 @@ export default function AdminDashboard() {
     const loadAttendanceForDate = async (date, classId) => {
         try {
             const res = await api.get(`/attendance/by-date/${classId}/${date}`);
-            if (res.data && res.data.periods) {
+            if (res.data && res.data.periods && res.data.periods.length > 0) {
                 // Load the timetable structure AND absentees from attendance record
                 const formattedTimetable = res.data.periods.map(period => ({
                     period: period.periodNum,
@@ -59,19 +59,49 @@ export default function AdminDashboard() {
                     setLastModified(new Date(res.data.updatedAt));
                 }
             } else {
-                // No attendance for this date, use default timetable
-                if (defaultTimetable) {
-                    setTimetable(defaultTimetable);
-                }
+                // No attendance for this date, fetch correct day's timetable
+                const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                const selectedDayName = days[new Date(date + 'T00:00:00').getDay()];
+
+                // Fetch the timetable for this specific day
+                const classRes = await api.get(`/class/${classId}`);
+                const daySchedule = classRes.data.timetable?.[selectedDayName] || [];
+                const subjectsList = classRes.data.subjects || [];
+
+                const formattedTimetable = daySchedule.map(slot => {
+                    const sub = subjectsList.find(s => s._id === slot.subjectId);
+                    return {
+                        period: slot.period,
+                        subjectName: sub ? sub.name : "Unknown",
+                        subjectId: slot.subjectId
+                    };
+                });
+                setTimetable(formattedTimetable);
                 setAbsentees({});
                 setHasModifications(false);
                 setLastModified(null);
             }
         } catch (err) {
-            // No attendance data for this date, use default timetable
-            console.log("No attendance for", date);
-            if (defaultTimetable) {
-                setTimetable(defaultTimetable);
+            // No attendance data for this date, fetch correct day's timetable
+            const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const selectedDayName = days[new Date(date + 'T00:00:00').getDay()];
+
+            try {
+                const classRes = await api.get(`/class/${classId}`);
+                const daySchedule = classRes.data.timetable?.[selectedDayName] || [];
+                const subjectsList = classRes.data.subjects || [];
+
+                const formattedTimetable = daySchedule.map(slot => {
+                    const sub = subjectsList.find(s => s._id === slot.subjectId);
+                    return {
+                        period: slot.period,
+                        subjectName: sub ? sub.name : "Unknown",
+                        subjectId: slot.subjectId
+                    };
+                });
+                setTimetable(formattedTimetable);
+            } catch (error) {
+                setTimetable([]);
             }
             setAbsentees({});
             setHasModifications(false);
@@ -117,13 +147,15 @@ export default function AdminDashboard() {
                 setDefaultTimetable(formattedTimetable); // Store as default
                 setLoading(false);
 
-                // Load attendance for today immediately after setting default
-                loadAttendanceForDate(today, storedClassId);
-
                 // Fetch list of dates with attendance
                 api.get(`/attendance/dates/${storedClassId}`)
                     .then(datesRes => {
-                        setAttendanceDates(datesRes.data.dates || []);
+                        // Convert ISO strings to YYYY-MM-DD format for calendar comparison
+                        const formattedDates = (datesRes.data.dates || []).map(dateStr => {
+                            return new Date(dateStr).toISOString().split('T')[0];
+                        });
+                        console.log('📅 Formatted attendance dates:', formattedDates);
+                        setAttendanceDates(formattedDates);
                     })
                     .catch(err => console.log("No attendance dates yet"));
             })
@@ -307,13 +339,17 @@ export default function AdminDashboard() {
                 <div className="flex gap-3 mb-6">
                     <button
                         onClick={() => setShowCalendar(!showCalendar)}
-                        className={`flex-1 py-3 rounded-full border transition text-sm font-medium flex items-center justify-center gap-2 ${showCalendar
+                        className={`flex-1 py-3 rounded-full border transition text-sm font-medium flex items-center justify-center gap-2 relative ${showCalendar
                             ? 'bg-blue-900/20 border-blue-500/50 text-blue-400'
                             : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-white/50'
                             }`}
                     >
                         <CalendarIcon className="w-4 h-4" />
                         {formatDateDisplay(selectedDate)}
+                        {/* Green dot if attendance is saved for this date */}
+                        {attendanceDates.includes(selectedDate) && (
+                            <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-green-500 rounded-full shadow-lg"></div>
+                        )}
                     </button>
                     <button
                         onClick={() => {

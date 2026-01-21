@@ -118,8 +118,13 @@ export default function Calendar({ selectedDate, onSelectDate, attendanceDates =
               `}
                         >
                             {day}
+                            {/* Green dot for attendance marked */}
+                            {hasAttendance(day) && !isSelected(day) && (
+                                <div className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full shadow-lg"></div>
+                            )}
+                            {/* Red dot for exams */}
                             {isExam(day) && !isSelected(day) && (
-                                <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                                <div className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full shadow-lg"></div>
                             )}
                         </button>
                     );

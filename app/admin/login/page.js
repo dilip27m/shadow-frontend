@@ -21,7 +21,12 @@ export default function AdminLogin() {
 
             // SAVE THE TOKEN AND CLASS ID
             localStorage.setItem('adminClassId', res.data.classId);
-            localStorage.setItem('token', res.data.token); // <--- NEW LINE
+            localStorage.setItem('token', res.data.token);
+
+            // Debug: Verify token was saved
+            console.log('✅ Login successful');
+            console.log('🔑 Token saved:', res.data.token ? 'Yes' : 'No');
+            console.log('📋 ClassId saved:', res.data.classId);
 
             router.push('/admin/dashboard');
         } catch (err) {

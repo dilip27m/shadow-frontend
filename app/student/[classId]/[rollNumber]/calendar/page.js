@@ -101,13 +101,13 @@ export default function StudentCalendar() {
                 </div>
 
                 {/* Day-specific Attendance */}
-                {dayAttendance && (
+                {selectedDate && (
                     <div className="card">
                         <h2 className="text-sm uppercase text-[var(--text-dim)] mb-4">
                             Attendance for {formatDateDisplay(selectedDate)}
                         </h2>
 
-                        {dayAttendance.periods.length === 0 ? (
+                        {!dayAttendance || !dayAttendance.periods || dayAttendance.periods.length === 0 ? (
                             <p className="text-center text-[var(--text-dim)] py-8">No classes on this day</p>
                         ) : (
                             <div className="space-y-3">
@@ -118,8 +118,8 @@ export default function StudentCalendar() {
                                             <span className="text-sm">{period.subjectName}</span>
                                         </div>
                                         <span className={`px-3 py-1 rounded-md text-sm font-semibold ${period.status === 'Present'
-                                                ? 'bg-[var(--success)] text-[var(--success-text)]'
-                                                : 'bg-[var(--danger)] text-[var(--danger-text)]'
+                                            ? 'bg-[var(--success)] text-[var(--success-text)]'
+                                            : 'bg-[var(--danger)] text-[var(--danger-text)]'
                                             }`}>
                                             {period.status}
                                         </span>

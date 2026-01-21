@@ -185,13 +185,25 @@ export default function BunkEffect() {
                                                     </div>
                                                 </div>
 
-                                                <div className={`p-2 rounded text-sm ${percentChange < 0 ? 'bg-red-900/20 text-red-400' : 'bg-gray-700 text-gray-300'
+                                                {/* Action Message */}
+                                                <div className={`p-2 rounded text-sm ${isSafe ? 'bg-green-900/20 text-green-400' :
+                                                        isDanger ? 'bg-red-900/20 text-red-400' :
+                                                            'bg-orange-900/20 text-orange-400'
                                                     }`}>
-                                                    <span className="font-semibold">
-                                                        {percentChange < 0 ? '⚠️' : '✓'} {percentChange.toFixed(1)}%
-                                                    </span>
-                                                    {' - '}
-                                                    {impact.classesOnSelectedDates} class{impact.classesOnSelectedDates > 1 ? 'es' : ''} on selected dates
+                                                    {(() => {
+                                                        const minPercentage = 75;
+
+                                                        if (impact.afterPercentage >= minPercentage) {
+                                                            return `✓ Still safe after bunking ${impact.classesOnSelectedDates} class${impact.classesOnSelectedDates > 1 ? 'es' : ''}`;
+                                                        } else {
+                                                            // Calculate classes needed to reach 75%
+                                                            const classesNeeded = Math.ceil(
+                                                                ((minPercentage / 100) * impact.afterTotal - impact.afterAttended) /
+                                                                (1 - (minPercentage / 100))
+                                                            );
+                                                            return `⚠️ After bunking ${impact.classesOnSelectedDates} class${impact.classesOnSelectedDates > 1 ? 'es' : ''}, attend ${classesNeeded} more to reach ${minPercentage}%`;
+                                                        }
+                                                    })()}
                                                 </div>
                                             </>
                                         )}
