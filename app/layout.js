@@ -12,7 +12,7 @@ export const viewport = {
 
 // 2. Metadata with Manifest link
 export const metadata = {
-  title: 'Shadow Attendance',
+  title: 'Shadow',
   description: 'Minimal attendance tracker',
   manifest: '/manifest.json', // Links to the file in /public
   appleWebApp: {
@@ -21,19 +21,19 @@ export const metadata = {
     title: 'Shadow',
   },
   icons: {
-    icon: '/favicon.ico',
+    icon: '/logo.png',
     apple: '/icon-192.png', // Icon for iPhone home screen
   },
 };
 
 export default function RootLayout({ children }) {
-    return (
-        <html lang="en">
-            <body>
-                <NotificationProvider>
-                    {children}
-                </NotificationProvider>
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en">
+      <body>
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
+      </body>
+    </html>
+  );
 }
