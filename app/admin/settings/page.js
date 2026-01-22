@@ -14,6 +14,7 @@ export default function AdminSettings() {
 
     // Settings state
     const [minPercentage, setMinPercentage] = useState(75);
+    const [classStrength, setClassStrength] = useState(70);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -28,6 +29,7 @@ export default function AdminSettings() {
         api.get(`/class/${storedClassId}`)
             .then(res => {
                 setClassName(res.data.className);
+                setClassStrength(res.data.totalStudents || 70);
                 if (res.data.settings) {
                     setMinPercentage(res.data.settings.minAttendancePercentage || 75);
                 }
@@ -51,8 +53,14 @@ export default function AdminSettings() {
             minAttendancePercentage: minPercentage
         };
 
+        const payload = {
+            classId,
+            settings,
+            totalStudents: classStrength
+        };
+
         try {
-            await api.put('/class/update-settings', { classId, settings });
+            await api.put('/class/update-settings', payload);
             notify({ message: 'Settings saved successfully!', type: 'success' });
         } catch (err) {
             notify({ message: 'Failed to save settings', type: 'error' });
@@ -93,6 +101,23 @@ export default function AdminSettings() {
                         />
                         <span className="text-2xl font-bold text-blue-400 min-w-[60px]">{minPercentage}%</span>
                     </div>
+                </div>
+
+                {/* Class Strength */}
+                <div className="card mb-4">
+                    <h2 className="text-sm uppercase text-[var(--text-dim)] mb-3">Class Strength</h2>
+                    <p className="text-sm text-[var(--text-dim)] mb-3">
+                        Total number of students in the class (controls attendance grid size)
+                    </p>
+                    <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={classStrength}
+                        onChange={(e) => setClassStrength(parseInt(e.target.value) || 1)}
+                        className="input w-32"
+                    />
+                    <span className="ml-3 text-[var(--text-dim)] text-sm">students</span>
                 </div>
 
                 {/* Save Button */}
