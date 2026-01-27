@@ -60,7 +60,7 @@ export default function AdminLogin() {
                             <input
                                 type="text"
                                 className="input"
-                                placeholder="e.g. CSE-3A"
+                                placeholder="e.g. S6 CSE-B "
                                 value={className}
                                 onChange={(e) => setClassName(e.target.value)}
                                 required

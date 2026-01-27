@@ -84,7 +84,7 @@ export default function Home() {
                         <input
                             type="text"
                             className="input mb-4"
-                            placeholder="Class Name (e.g. CSE-3A)"
+                            placeholder="Class Name (e.g. S6 CSE-B)"
                             value={className}
                             onChange={(e) => setClassName(e.target.value)}
                             required
@@ -93,7 +93,7 @@ export default function Home() {
                         <input
                             type="number"
                             className="input mb-4"
-                            placeholder="Roll Number"
+                            placeholder="Roll Number (e.g. 1-100)"
                             value={rollNumber}
                             onChange={(e) => setRollNumber(e.target.value)}
                             required
