@@ -29,14 +29,22 @@ export default function Home() {
         e.preventDefault();
         setLoading(true);
 
+        // Validate roll number
+        const rollNo = parseInt(rollNumber);
+        if (!rollNo || rollNo < 1) {
+            notify({ message: "Please enter a valid roll number (1 or higher)", type: 'error' });
+            setLoading(false);
+            return;
+        }
+
         try {
             const res = await api.get(`/class/lookup/${className.trim()}`);
             const classId = res.data.classId;
 
             localStorage.setItem('studentClassId', classId);
-            localStorage.setItem('studentRoll', rollNumber);
+            localStorage.setItem('studentRoll', rollNo.toString());
 
-            router.push(`/student/${classId}/${rollNumber}`);
+            router.push(`/student/${classId}/${rollNo}`);
         } catch (err) {
             notify({ message: "Class not found! Check the name.", type: 'error' });
             setLoading(false);
@@ -104,27 +112,9 @@ export default function Home() {
                         </button>
                     </form>
 
-                    <div className="mt-6 flex flex-col gap-2">
-                        <p className="text-center text-sm text-[var(--text-dim)]">Are you a class representative?</p>
-                        <button
-                            onClick={() => router.push('/admin/setup')}
-                            className="btn btn-outline"
-                        >
-                            Create New Class
-                        </button>
-                        <button
-                            onClick={() => router.push('/admin/login')}
-                            className="btn btn-outline"
-                        >
-                            Admin Login
-                        </button>
-                        <button
-                            onClick={() => router.push('/teacher/login')}
-                            className="btn btn-outline"
-                        >
-                            Teacher Login
-                        </button>
-                    </div>
+                    <p className="text-center text-xs text-[var(--text-dim)] mt-4">
+                        Teachers & Class Reps: Use the buttons in the top-right corner
+                    </p>
                 </div>
 
                 {/* How It Works Section */}

@@ -17,7 +17,10 @@ export default function TeacherLogin() {
         setLoading(true);
 
         try {
-            const res = await api.post('/teacher/login', { email, password });
+            const res = await api.post('/teacher/login', {
+                email: email.trim(),
+                password
+            });
 
             // SAVE THE TOKEN AND TEACHER DETAILS
             localStorage.setItem('token', res.data.token);
@@ -85,6 +88,16 @@ export default function TeacherLogin() {
                 </div>
 
                 <div className="mt-6 text-center">
+                    <p className="text-sm text-[var(--text-dim)] mb-2">Don't have an account?</p>
+                    <button
+                        onClick={() => router.push('/teacher/register')}
+                        className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                        Register here →
+                    </button>
+                </div>
+
+                <div className="mt-4 text-center">
                     <button
                         onClick={() => router.push('/')}
                         className="text-sm text-[var(--text-dim)] hover:text-white"

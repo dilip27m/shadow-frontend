@@ -1,132 +1,44 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Edit, Save, Plus, X, Calendar as CalendarIcon, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Save, Plus, Trash2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Key, CheckCircle, AlertCircle } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import Calendar from '@/app/components/Calendar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
+import CustomSelect from '@/app/components/CustomSelect';
 
 export default function AdminDashboard() {
     const router = useRouter();
     const notify = useNotification();
     const [loading, setLoading] = useState(true);
-    const [timetable, setTimetable] = useState([]);
     const [classId, setClassId] = useState(null);
     const [className, setClassName] = useState('');
-    const [todayName, setTodayName] = useState("");
+    const [classStrength, setClassStrength] = useState(70);
+    const [subjects, setSubjects] = useState([]); // Saved subjects with teacher info
     const [selectedDate, setSelectedDate] = useState('');
-    const [overrideDay, setOverrideDay] = useState(null);
-    const [isEditing, setIsEditing] = useState(false);
-    const [subjects, setSubjects] = useState([]);
-    const [absentees, setAbsentees] = useState({});
-    const [absentInputs, setAbsentInputs] = useState({}); // Track raw input text
-    const [verificationCodes, setVerificationCodes] = useState({}); // Track teacher codes
-    const [verificationStatuses, setVerificationStatuses] = useState({}); // Track verification status
     const [showCalendar, setShowCalendar] = useState(false);
     const [attendanceDates, setAttendanceDates] = useState([]);
-    const [hasModifications, setHasModifications] = useState(false);
-    const [isViewingPastDate, setIsViewingPastDate] = useState(false);
-    const [defaultTimetable, setDefaultTimetable] = useState(null);
     const [lastModified, setLastModified] = useState(null);
-    const [classStrength, setClassStrength] = useState(70); // Default to 70, will be updated from backend
 
-    // Check if viewing past date
-    const checkIfPastDate = (date) => {
-        const today = new Date().toISOString().split('T')[0];
-        setIsViewingPastDate(date < today);
-    };
+    // Periods for the selected date
+    const [periods, setPeriods] = useState([]);
+    const [expandedPeriod, setExpandedPeriod] = useState(null);
+    const [hasChanges, setHasChanges] = useState(false);
 
-    // Load attendance for selected date
-    const loadAttendanceForDate = async (date, classId) => {
-        try {
-            const res = await api.get(`/attendance/by-date/${classId}/${date}`);
-            if (res.data && res.data.periods && res.data.periods.length > 0) {
-                // Load the timetable structure AND absentees from attendance record
-                const formattedTimetable = res.data.periods.map(period => ({
-                    period: period.periodNum,
-                    subjectName: period.subjectName,
-                    subjectId: period.subjectId
-                }));
+    // Teacher verification codes per period
+    const [verificationCodes, setVerificationCodes] = useState({});
 
-                const newAbsentees = {};
-                const newAbsentInputs = {};
-                const newVerificationStatuses = {};
+    // New period form
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [newSubjectName, setNewSubjectName] = useState('');
+    const [selectedSubjectId, setSelectedSubjectId] = useState('');
+    const [isCustomSubject, setIsCustomSubject] = useState(false);
 
-                res.data.periods.forEach((period, index) => {
-                    newAbsentees[index] = period.absentRollNumbers || [];
-                    newAbsentInputs[index] = (period.absentRollNumbers || []).sort((a, b) => a - b).join(', ');
-                    newVerificationStatuses[index] = period.isVerified;
-                });
+    // Ref to track if initial load is done
+    const isInitialLoad = useRef(true);
 
-                setTimetable(formattedTimetable);
-                setAbsentees(newAbsentees);
-                setAbsentInputs(newAbsentInputs);
-                setVerificationStatuses(newVerificationStatuses);
-                setVerificationCodes({}); // Reset codes input
-                setHasModifications(false);
-
-                // Set last modified time
-                if (res.data.updatedAt) {
-                    setLastModified(new Date(res.data.updatedAt));
-                }
-            } else {
-                // No attendance for this date, fetch correct day's timetable
-                const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                const selectedDayName = days[new Date(date + 'T00:00:00').getDay()];
-
-                // Fetch the timetable for this specific day
-                const classRes = await api.get(`/class/${classId}`);
-                const daySchedule = classRes.data.timetable?.[selectedDayName] || [];
-                const subjectsList = classRes.data.subjects || [];
-
-                const formattedTimetable = daySchedule.map(slot => {
-                    const sub = subjectsList.find(s => s._id === slot.subjectId);
-                    return {
-                        period: slot.period,
-                        subjectName: sub ? sub.name : "Unknown",
-                        subjectId: slot.subjectId
-                    };
-                });
-                setTimetable(formattedTimetable);
-                setAbsentees({});
-                setAbsentInputs({});
-                setVerificationStatuses({});
-                setVerificationCodes({});
-                setHasModifications(false);
-                setLastModified(null);
-            }
-        } catch (err) {
-            // No attendance data for this date, fetch correct day's timetable
-            const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-            const selectedDayName = days[new Date(date + 'T00:00:00').getDay()];
-
-            try {
-                const classRes = await api.get(`/class/${classId}`);
-                const daySchedule = classRes.data.timetable?.[selectedDayName] || [];
-                const subjectsList = classRes.data.subjects || [];
-
-                const formattedTimetable = daySchedule.map(slot => {
-                    const sub = subjectsList.find(s => s._id === slot.subjectId);
-                    return {
-                        period: slot.period,
-                        subjectName: sub ? sub.name : "Unknown",
-                        subjectId: slot.subjectId
-                    };
-                });
-                setTimetable(formattedTimetable);
-            } catch (error) {
-                setTimetable([]);
-            }
-            setAbsentees({});
-            setAbsentInputs({});
-            setVerificationStatuses({});
-            setVerificationCodes({});
-            setHasModifications(false);
-            setLastModified(null);
-        }
-    };
-
+    // Load class info on mount
     useEffect(() => {
         const storedClassId = localStorage.getItem('adminClassId');
         if (!storedClassId) {
@@ -137,93 +49,79 @@ export default function AdminDashboard() {
 
         const today = new Date().toISOString().split('T')[0];
         setSelectedDate(today);
-        checkIfPastDate(today);
 
         api.get(`/class/${storedClassId}`)
             .then(res => {
-                const subjects = res.data.subjects;
-                setSubjects(subjects);
                 setClassName(res.data.className);
-                setClassStrength(res.data.totalStudents || 70); // Fetch actual class strength
-
-                const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                const currentDay = days[new Date().getDay()];
-                setTodayName(currentDay);
-
-                const dayToLoad = overrideDay || currentDay;
-                const todaySchedule = res.data.timetable?.[dayToLoad] || [];
-
-                const formattedTimetable = todaySchedule.map(slot => {
-                    const sub = subjects.find(s => s._id === slot.subjectId);
-                    return {
-                        period: slot.period,
-                        subjectName: sub ? sub.name : "Unknown",
-                        subjectId: slot.subjectId
-                    };
-                });
-
-                setTimetable(formattedTimetable);
-                setDefaultTimetable(formattedTimetable); // Store as default
+                setClassStrength(res.data.totalStudents || 70);
+                setSubjects(res.data.subjects || []);
                 setLoading(false);
 
-                // IMPROVED: Immediately load attendance for today if exists
-                // This prevents the "empty inputs" flash or state mismatch
+                // Load attendance for today (only on initial load)
                 loadAttendanceForDate(today, storedClassId);
 
-                // Fetch list of dates with attendance
                 api.get(`/attendance/dates/${storedClassId}`)
                     .then(datesRes => {
-                        // Convert ISO strings to YYYY-MM-DD format for calendar comparison
                         const formattedDates = (datesRes.data.dates || []).map(dateStr => {
                             return new Date(dateStr).toISOString().split('T')[0];
                         });
-                        console.log('📅 Formatted attendance dates:', formattedDates);
                         setAttendanceDates(formattedDates);
                     })
-                    .catch(err => console.log("No attendance dates yet"));
+                    .catch(() => { });
+
+                // Mark initial load as complete after a short delay
+                setTimeout(() => {
+                    isInitialLoad.current = false;
+                }, 500);
             })
             .catch(err => {
                 console.error(err);
                 setLoading(false);
             });
-    }, [router, overrideDay]);
+    }, [router]);
 
-    // Load attendance when date changes (not on initial load)
+    // Load attendance when date changes (skip initial load)
     useEffect(() => {
-        // Only load if we've already loaded once (defaultTimetable exists)
-        // and the date or classId actually changed
-        if (classId && selectedDate && defaultTimetable) {
+        if (classId && selectedDate && !isInitialLoad.current) {
             loadAttendanceForDate(selectedDate, classId);
-            checkIfPastDate(selectedDate);
-            setShowCalendar(false); // Close calendar after selection
-
-            // Update todayName to match selected date
-            const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-            const selectedDayName = days[new Date(selectedDate + 'T00:00:00').getDay()];
-            setTodayName(selectedDayName);
+            setShowCalendar(false);
         }
-    }, [selectedDate]); // Only depend on selectedDate, not classId or defaultTimetable
+    }, [selectedDate]);
 
-    // Reload timetable when overrideDay changes
-    useEffect(() => {
-        if (overrideDay && classId) {
-            // Reload from default schedule when override changes
-            api.get(`/class/${classId}`)
-                .then(res => {
-                    const todaySchedule = res.data.timetable?.[overrideDay] || [];
-                    const formattedTimetable = todaySchedule.map(slot => {
-                        const sub = subjects.find(s => s._id === slot.subjectId);
-                        return {
-                            period: slot.period,
-                            subjectName: sub ? sub.name : "Unknown",
-                            subjectId: slot.subjectId
-                        };
-                    });
-                    setTimetable(formattedTimetable);
-                    setDefaultTimetable(formattedTimetable);
+    const loadAttendanceForDate = async (date, classId) => {
+        try {
+            const res = await api.get(`/attendance/by-date/${classId}/${date}`);
+            if (res.data && res.data.periods && res.data.periods.length > 0) {
+                setPeriods(res.data.periods.map(p => ({
+                    periodNum: p.periodNum,
+                    subjectName: p.subjectName || '',
+                    subjectId: p.subjectId || '',
+                    absentRollNumbers: p.absentRollNumbers || [],
+                    isVerified: p.isVerified || false
+                })));
+
+                // Pre-fill verification codes for verified periods (keyed by periodNum)
+                const codes = {};
+                res.data.periods.forEach((p) => {
+                    codes[p.periodNum] = p.isVerified ? '****' : '';
                 });
+                setVerificationCodes(codes);
+
+                setLastModified(res.data.updatedAt ? new Date(res.data.updatedAt) : null);
+            } else {
+                setPeriods([]);
+                setVerificationCodes({});
+                setLastModified(null);
+            }
+            setHasChanges(false);
+            setExpandedPeriod(null);
+        } catch (err) {
+            setPeriods([]);
+            setVerificationCodes({});
+            setLastModified(null);
+            setHasChanges(false);
         }
-    }, [overrideDay]);
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('adminClassId');
@@ -231,127 +129,180 @@ export default function AdminDashboard() {
         router.push('/');
     };
 
-    const addPeriod = () => {
-        const nextPeriodNum = timetable.length > 0
-            ? Math.max(...timetable.map(p => p.period)) + 1
-            : 1;
-        setTimetable([...timetable, { period: nextPeriodNum, subjectId: "", subjectName: "" }]);
-        setHasModifications(true);
-    };
-
-    const removePeriod = (periodNum) => {
-        const indexToRemove = timetable.findIndex(p => p.period === periodNum);
-        if (indexToRemove === -1) return;
-
-        setTimetable(prev => prev.filter(p => p.period !== periodNum));
-
-        const shiftState = (prev) => {
-            const updated = {};
-            Object.keys(prev).forEach(key => {
-                const k = parseInt(key, 10);
-                if (isNaN(k)) return;
-
-                if (k < indexToRemove) {
-                    updated[k] = prev[k];
-                } else if (k > indexToRemove) {
-                    updated[k - 1] = prev[k];
-                }
-            });
-            return updated;
-        };
-
-        setAbsentees(shiftState);
-        setAbsentInputs(shiftState);
-        setVerificationStatuses(shiftState);
-        setVerificationCodes(shiftState);
-        setHasModifications(true);
-    };
-
-    const updatePeriod = (periodNum, subjectId) => {
+    // Get teacher info for a subject (show PIN for any assigned teacher)
+    const getTeacherForSubject = (subjectId) => {
+        if (!subjectId) return null;
         const subject = subjects.find(s => s._id === subjectId);
-        setTimetable(prev => prev.map(slot =>
-            slot.period === periodNum
-                ? { ...slot, subjectId, subjectName: subject ? subject.name : "" }
-                : slot
-        ));
-        setHasModifications(true);
+        // Show PIN entry for any teacher that's assigned (not just Verified)
+        if (subject && subject.teacherId) {
+            console.log('📚 Subject:', subject.name, 'Teacher:', subject.teacherName, 'Status:', subject.teacherStatus);
+            return {
+                name: subject.teacherName || 'Assigned Teacher',
+                id: subject.teacherId
+            };
+        }
+        return null;
     };
 
-    const toggleAbsent = (periodIdx, rollNo) => {
-        setAbsentees(prev => {
-            const currentList = prev[periodIdx] || [];
-            let newList;
-            if (currentList.includes(rollNo)) {
-                newList = currentList.filter(r => r !== rollNo);
-            } else {
-                newList = [...currentList, rollNo];
+    // Add a new period
+    const addPeriod = () => {
+        const nextNum = periods.length > 0
+            ? Math.max(...periods.map(p => p.periodNum)) + 1
+            : 1;
+
+        let periodSubjectId = '';
+        let periodSubjectName = '';
+
+        if (!isCustomSubject && selectedSubjectId) {
+            const existingSubject = subjects.find(s => s._id === selectedSubjectId);
+            if (existingSubject) {
+                periodSubjectId = existingSubject._id;
+                periodSubjectName = existingSubject.name;
+                console.log('✅ Selected existing subject:', periodSubjectName);
+            }
+        }
+
+        // Fallback or Custom
+        if (!periodSubjectId) {
+            // Try matching by name if custom or fallback
+            const inputName = newSubjectName.trim();
+            if (!inputName && !periodSubjectName) {
+                notify({ message: 'Please enter a subject name', type: 'error' });
+                return;
             }
 
-            // Sync the input text as well
-            setAbsentInputs(prevInputs => ({
-                ...prevInputs,
-                [periodIdx]: newList.sort((a, b) => a - b).join(', ')
-            }));
+            // Even if custom, check if it matches an existing subject by name
+            const existingSubject = subjects.find(s =>
+                s.name.toLowerCase() === inputName.toLowerCase()
+            );
 
-            return { ...prev, [periodIdx]: newList };
-        });
-        setHasModifications(true);
+            if (existingSubject) {
+                periodSubjectId = existingSubject._id;
+                periodSubjectName = existingSubject.name;
+                console.log('✅ Custom name matched existing subject:', periodSubjectName);
+            } else {
+                periodSubjectName = inputName;
+                console.log('⚠️ Using custom subject name (no teacher verification):', periodSubjectName);
+            }
+        }
+
+        console.log('🔍 Final Period Data -> Name:', periodSubjectName, 'ID:', periodSubjectId);
+
+        const newPeriod = {
+            periodNum: nextNum,
+            subjectName: periodSubjectName,
+            subjectId: periodSubjectId,
+            absentRollNumbers: [],
+            isVerified: false
+        };
+
+        const newPeriods = [...periods, newPeriod];
+        setPeriods(newPeriods);
+        setVerificationCodes(prev => ({ ...prev, [nextNum]: '' }));
+        setNewSubjectName('');
+        setSelectedSubjectId('');
+        setIsCustomSubject(false);
+        setShowAddForm(false);
+        setExpandedPeriod(nextNum);
+        setHasChanges(true);
     };
 
-    const handleBulkAbsentInput = (periodIdx, inputValue) => {
-        // Store the raw input value
-        setAbsentInputs(prev => ({ ...prev, [periodIdx]: inputValue }));
+    // Delete a period
+    const deletePeriod = (periodNum) => {
+        setPeriods(periods.filter(p => p.periodNum !== periodNum));
 
-        if (!inputValue.trim()) {
-            // Clear all if empty
-            setAbsentees(prev => ({ ...prev, [periodIdx]: [] }));
-            setHasModifications(true);
+        // Remove verification code for deleted period (keyed by periodNum)
+        setVerificationCodes(prev => {
+            const newCodes = { ...prev };
+            delete newCodes[periodNum];
+            return newCodes;
+        });
+
+        setHasChanges(true);
+        if (expandedPeriod === periodNum) setExpandedPeriod(null);
+    };
+
+    // Toggle absent status
+    const toggleAbsent = (periodNum, rollNo) => {
+        setPeriods(periods.map(p => {
+            if (p.periodNum !== periodNum) return p;
+            const isAbsent = p.absentRollNumbers.includes(rollNo);
+            return {
+                ...p,
+                absentRollNumbers: isAbsent
+                    ? p.absentRollNumbers.filter(r => r !== rollNo)
+                    : [...p.absentRollNumbers, rollNo].sort((a, b) => a - b)
+            };
+        }));
+        setHasChanges(true);
+    };
+
+    // Handle verification code input (keyed by periodNum)
+    const handleCodeInput = (periodNum, value) => {
+        // Only allow 4 digits
+        const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+        setVerificationCodes(prev => ({ ...prev, [periodNum]: cleanValue }));
+        setHasChanges(true);
+    };
+
+    // Save attendance
+    const saveAttendance = async () => {
+        if (!classId) return;
+
+        // Check if any periods with assigned teachers need verification
+        const periodsNeedingVerification = periods.filter((p) => {
+            const teacher = getTeacherForSubject(p.subjectId);
+            // If already verified, we don't need a PIN (unless we want to re-verify, but usually we presume it persists)
+            if (p.isVerified) return false;
+
+            const code = verificationCodes[p.periodNum];  // Use periodNum as key
+            return teacher && (!code || code.length !== 4);
+        });
+
+        if (periodsNeedingVerification.length > 0) {
+            const subjectNames = periodsNeedingVerification.map(p => p.subjectName).join(', ');
+            notify({
+                message: `Please enter teacher PIN for: ${subjectNames}`,
+                type: 'error'
+            });
             return;
         }
 
-        // Parse comma-separated values
-        const rollNumbers = inputValue
-            .split(',')
-            .map(str => parseInt(str.trim()))
-            .filter(num => !isNaN(num) && num >= 1 && num <= classStrength); // Validate range
-
-        // Remove duplicates
-        const uniqueRolls = [...new Set(rollNumbers)];
-
-        setAbsentees(prev => ({ ...prev, [periodIdx]: uniqueRolls }));
-        setHasModifications(true);
-    };
-
-    const handleVerificationCodeInput = (periodIdx, value) => {
-        setVerificationCodes(prev => ({ ...prev, [periodIdx]: value }));
-        setHasModifications(true);
-    };
-
-    const submitAttendance = async () => {
-        if (!classId) return;
-
-        const formattedPeriods = timetable.map((slot, index) => ({
-            periodNum: slot.period,
-            subjectId: slot.subjectId,
-            subjectName: slot.subjectName,
-            absentRollNumbers: absentees[index] || [],
-            verificationCode: verificationCodes[index] || ""
+        const formattedPeriods = periods.map((p) => ({
+            periodNum: p.periodNum,
+            subjectId: p.subjectId,
+            subjectName: p.subjectName,
+            absentRollNumbers: p.absentRollNumbers,
+            verificationCode: verificationCodes[p.periodNum] !== '****' ? verificationCodes[p.periodNum] : ''  // Use periodNum
         }));
 
         try {
             const res = await api.post('/attendance/mark', {
-                classId: classId,
+                classId,
                 date: selectedDate,
                 periods: formattedPeriods
             });
-            notify({ message: "Attendance Saved Successfully", type: 'success' });
-            setIsEditing(false);
-            setHasModifications(false);
 
-            // Refetch to get updated statuses (like verification)
-            loadAttendanceForDate(selectedDate, classId);
+            // Check if all periods with teachers were verified
+            const savedPeriods = res.data.data.periods || [];
+            const failedVerifications = savedPeriods.filter((p, idx) => {
+                const teacher = getTeacherForSubject(p.subjectId);
+                return teacher && !p.isVerified;
+            });
 
-            // Refresh attendance dates list
+            if (failedVerifications.length > 0) {
+                const failedNames = failedVerifications.map(p => p.subjectName).join(', ');
+                notify({
+                    message: `Saved, but wrong PIN for: ${failedNames}`,
+                    type: 'error'
+                });
+            } else {
+                notify({ message: 'Attendance saved & verified!', type: 'success' });
+            }
+
+            setHasChanges(false);
+
+            // Refresh
             api.get(`/attendance/dates/${classId}`)
                 .then(datesRes => {
                     const formattedDates = (datesRes.data.dates || []).map(dateStr => {
@@ -359,104 +310,73 @@ export default function AdminDashboard() {
                     });
                     setAttendanceDates(formattedDates);
                 })
-                .catch(err => console.log("Failed to refresh dates"));
+                .catch(() => { });
+
+            loadAttendanceForDate(selectedDate, classId);
 
         } catch (err) {
-            notify({ message: "Failed to save attendance", type: 'error' });
+            notify({ message: 'Failed to save attendance', type: 'error' });
         }
     };
 
     // Format date for display
     const formatDateDisplay = (dateStr) => {
-        const date = new Date(dateStr);
+        const date = new Date(dateStr + 'T00:00:00');
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
-        const isToday = date.toDateString() === today.toDateString();
-        const isYesterday = date.toDateString() === yesterday.toDateString();
-
-        if (isToday) return "Today";
-        if (isYesterday) return "Yesterday";
+        if (date.getTime() === today.getTime()) return "Today";
+        if (date.getTime() === yesterday.getTime()) return "Yesterday";
 
         return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
+            weekday: 'short', month: 'short', day: 'numeric'
         });
     };
 
-    // Determine button text
-    const getButtonText = () => {
-        if (hasModifications || isEditing) {
-            return 'Save Changes';
-        }
-        if (isViewingPastDate) {
-            return 'Update Attendance';
-        }
-        return 'Save Attendance';
-    };
-
-    if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    if (loading) {
+        return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    }
 
     return (
         <>
             <Navbar isAdmin={true} onLogout={handleLogout} classId={classId} />
 
-            <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+            <div className="max-w-4xl mx-auto px-4 py-6 pb-28">
 
                 {/* Header */}
                 <div className="mb-6">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-1">Mark Attendance</h1>
-                            <p className="text-[var(--text-dim)] text-sm">{className}</p>
-                        </div>
-                    </div>
+                    <h1 className="text-2xl font-bold mb-1">Mark Attendance</h1>
+                    <p className="text-[var(--text-dim)] text-sm">{className}</p>
                     {lastModified && (
                         <p className="text-xs text-[var(--text-dim)] mt-1">
-                            Last modified: {lastModified.toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
+                            Last saved: {lastModified.toLocaleString('en-US', {
+                                month: 'short', day: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
                             })}
                         </p>
                     )}
                 </div>
 
-                {/* Date Display and Edit Mode Row */}
-                <div className="flex gap-3 mb-6">
-                    <button
-                        onClick={() => setShowCalendar(!showCalendar)}
-                        className={`flex-1 py-3 rounded-full border transition text-sm font-medium flex items-center justify-center gap-2 relative ${showCalendar
-                            ? 'bg-blue-900/20 border-blue-500/50 text-blue-400'
-                            : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-white/50'
-                            }`}
-                    >
+                {/* Date Picker */}
+                <button
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    className={`w-full py-3 px-4 rounded-xl border transition text-sm font-medium flex items-center justify-between mb-4 ${showCalendar
+                        ? 'bg-blue-900/20 border-blue-500/50 text-blue-400'
+                        : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-white/50'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
                         <CalendarIcon className="w-4 h-4" />
-                        {formatDateDisplay(selectedDate)}
-                        {/* Green dot if attendance is saved for this date */}
+                        <span>{formatDateDisplay(selectedDate)}</span>
                         {attendanceDates.includes(selectedDate) && (
-                            <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-green-500 rounded-full shadow-lg"></div>
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                         )}
-                    </button>
-                    <button
-                        onClick={() => {
-                            setIsEditing(!isEditing);
-                            if (!isEditing) setHasModifications(true);
-                        }}
-                        className={`flex-1 py-3 rounded-full border transition text-sm font-medium flex items-center justify-center gap-2 ${isEditing
-                            ? 'bg-orange-900/20 border-orange-500/50 text-orange-400'
-                            : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-white/50'
-                            }`}
-                    >
-                        <Edit className="w-4 h-4" />
-                        Edit Mode
-                    </button>
-                </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showCalendar ? 'rotate-180' : ''}`} />
+                </button>
 
-                {/* Calendar View */}
                 {showCalendar && (
                     <div className="mb-6">
                         <Calendar
@@ -467,179 +387,248 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {/* Edit Mode Panel */}
-                {isEditing && (
-                    <div className="card mb-6 border-orange-500/30 bg-orange-900/10">
-                        <h2 className="text-sm uppercase text-orange-400 mb-3">Editing Options</h2>
-
-                        {/* Day Override in Edit Mode */}
-                        <div className="mb-3">
-                            <label className="text-xs text-[var(--text-dim)] block mb-2">Use Different Day's Schedule</label>
-                            <select
-                                value={overrideDay || todayName}
-                                onChange={(e) => {
-                                    setOverrideDay(e.target.value === todayName ? null : e.target.value);
-                                    setHasModifications(true);
-                                }}
-                                className="input w-full"
-                            >
-                                <option value={todayName}>{todayName} (Default)</option>
-                                <option value="Monday">Monday</option>
-                                <option value="Tuesday">Tuesday</option>
-                                <option value="Wednesday">Wednesday</option>
-                                <option value="Thursday">Thursday</option>
-                                <option value="Friday">Friday</option>
-                                <option value="Saturday">Saturday</option>
-                            </select>
-                        </div>
-
-                        <p className="text-xs text-[var(--text-dim)]">
-                            Modify periods, add/remove, or change subjects for this date only
-                        </p>
-                    </div>
-                )}
-
-                {/* Timetable & Attendance */}
-                {timetable.length === 0 ? (
+                {/* Periods List */}
+                {periods.length === 0 && !showAddForm ? (
                     <div className="card text-center py-12">
-                        <p className="text-[var(--text-dim)] mb-4">No classes scheduled for {overrideDay || todayName}</p>
+                        <p className="text-[var(--text-dim)] mb-4">No periods recorded for this date</p>
                         <button
-                            onClick={() => router.push('/admin/timetable')}
-                            className="btn btn-primary inline-flex w-auto px-6"
+                            onClick={() => setShowAddForm(true)}
+                            className="btn btn-primary inline-flex items-center gap-2"
                         >
-                            Set Up Timetable Now
+                            <Plus className="w-4 h-4" />
+                            Add First Period
                         </button>
                     </div>
                 ) : (
-                    <>
-                        {timetable.map((slot, index) => (
-                            <div key={index} className="card mb-4">
+                    <div className="space-y-4">
+                        {periods.map((period) => {
+                            const teacher = getTeacherForSubject(period.subjectId);
+                            const needsVerification = teacher && !period.isVerified;
 
-                                <div className="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border)]">
-                                    <div className="flex flex-col gap-1 w-full mr-4">
+                            return (
+                                <div key={period.periodNum} className="card">
+                                    {/* Period Header */}
+                                    <div
+                                        className="flex justify-between items-center cursor-pointer"
+                                        onClick={() => setExpandedPeriod(
+                                            expandedPeriod === period.periodNum ? null : period.periodNum
+                                        )}
+                                    >
                                         <div className="flex items-center gap-3">
-                                            <span className="text-lg font-bold text-[var(--text-dim)]">P{slot.period}</span>
-                                            {isEditing ? (
-                                                <select
-                                                    className="input w-auto min-w-[150px]"
-                                                    value={slot.subjectId}
-                                                    onChange={(e) => updatePeriod(slot.period, e.target.value)}
-                                                >
-                                                    <option value="">-- Select --</option>
-                                                    {subjects.map(sub => (
-                                                        <option key={sub._id} value={sub._id}>{sub.name}</option>
-                                                    ))}
-                                                </select>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <h2 className="text-lg font-semibold">{slot.subjectName}</h2>
-                                                    {verificationStatuses[index] && (
-                                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                                    )}
-                                                </div>
-                                            )}
+                                            <span className="text-lg font-bold text-[var(--text-dim)]">
+                                                P{period.periodNum}
+                                            </span>
+                                            <div>
+                                                <h2 className="text-lg font-semibold">{period.subjectName}</h2>
+                                                {teacher && (
+                                                    <p className="text-xs text-[var(--text-dim)]">
+                                                        Teacher: {teacher.name}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                        {/* Teacher Code Input */}
-                                        {!isEditing && (
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Teacher Code"
-                                                    className={`bg-white/5 border border-white/10 rounded px-2 py-1 text-xs w-24 focus:outline-none focus:border-blue-500 transition ${verificationStatuses[index] ? 'opacity-50' : ''}`}
-                                                    value={verificationCodes[index] || ""}
-                                                    onChange={(e) => handleVerificationCodeInput(index, e.target.value)}
-                                                    disabled={!!verificationStatuses[index]} // Disable if already verified? Maybe allow edit if code was wrong? But if verified, keep it.
-                                                />
-                                                {verificationStatuses[index] ? (
-                                                    <span className="text-xs text-green-400 flex items-center gap-1">
+                                        <div className="flex items-center gap-2">
+                                            {/* Verification Status */}
+                                            {teacher && (
+                                                period.isVerified ? (
+                                                    <span className="flex items-center gap-1 text-xs text-green-400">
+                                                        <CheckCircle className="w-3 h-3" />
                                                         Verified
                                                     </span>
                                                 ) : (
-                                                    verificationCodes[index] && <span className="text-xs text-[var(--text-dim)]">Pending</span>
-                                                )}
+                                                    <span className="flex items-center gap-1 text-xs text-orange-400">
+                                                        <Key className="w-3 h-3" />
+                                                        Needs PIN
+                                                    </span>
+                                                )
+                                            )}
+                                            <span className={`px-3 py-1 rounded-lg text-sm font-medium ${period.absentRollNumbers.length > 0
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : 'bg-green-500/20 text-green-400'
+                                                }`}>
+                                                {period.absentRollNumbers.length} absent
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deletePeriod(period.periodNum);
+                                                }}
+                                                className="p-2 hover:bg-red-500/20 rounded-lg transition"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-400" />
+                                            </button>
+                                            {expandedPeriod === period.periodNum
+                                                ? <ChevronUp className="w-4 h-4" />
+                                                : <ChevronDown className="w-4 h-4" />
+                                            }
+                                        </div>
+                                    </div>
+
+                                    {/* Expanded Content */}
+                                    {expandedPeriod === period.periodNum && (
+                                        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+
+                                            {/* Teacher PIN Input */}
+                                            {teacher && !period.isVerified && (
+                                                <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                                                    <label className="text-xs text-orange-400 flex items-center gap-1 mb-2">
+                                                        <Key className="w-3 h-3" />
+                                                        Teacher Verification Required
+                                                    </label>
+                                                    <div className="flex gap-2 items-center">
+                                                        <input
+                                                            type="text"
+                                                            value={verificationCodes[period.periodNum] || ''}
+                                                            onChange={(e) => handleCodeInput(period.periodNum, e.target.value)}
+                                                            placeholder="Enter 4-digit PIN"
+                                                            className="input flex-1 text-center text-xl tracking-widest font-mono"
+                                                            maxLength={4}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <span className="text-xs text-[var(--text-dim)]">
+                                                            Ask {teacher.name}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {teacher && period.isVerified && (
+                                                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle className="w-4 h-4 text-green-400" />
+                                                        <span className="text-sm text-green-400">
+                                                            Verified by {teacher.name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs text-green-400/60">
+                                                        🔒 Locked
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            <p className="text-xs text-[var(--text-dim)] mb-3">
+                                                {period.isVerified
+                                                    ? 'This period is verified and locked. Changes not allowed.'
+                                                    : 'Tap roll numbers to mark absent (red = absent)'
+                                                }
+                                            </p>
+                                            <div className={`grid grid-cols-7 sm:grid-cols-10 gap-2 ${period.isVerified ? 'opacity-60' : ''}`}>
+                                                {[...Array(classStrength)].map((_, i) => {
+                                                    const roll = i + 1;
+                                                    const isAbsent = period.absentRollNumbers.includes(roll);
+
+                                                    return (
+                                                        <button
+                                                            key={roll}
+                                                            onClick={() => !period.isVerified && toggleAbsent(period.periodNum, roll)}
+                                                            disabled={period.isVerified}
+                                                            className={`aspect-square rounded-lg text-sm font-medium transition-all ${period.isVerified
+                                                                ? 'cursor-not-allowed'
+                                                                : ''
+                                                                } ${isAbsent
+                                                                    ? 'bg-red-500/30 text-red-300 border border-red-500/50'
+                                                                    : 'bg-white/5 text-white/70 border border-white/10 hover:border-white/30'
+                                                                }`}
+                                                        >
+                                                            {roll}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className={`px-3 py-1 rounded-md text-sm font-semibold ${(absentees[index] || []).length > 0
-                                            ? 'bg-[var(--danger)] text-[var(--danger-text)]'
-                                            : 'bg-[var(--success)] text-[var(--success-text)]'
-                                            }`}>
-                                            {(absentees[index] || []).length} Absent
-                                        </span>
-                                        {isEditing && (
-                                            <button
-                                                onClick={() => removePeriod(slot.period)}
-                                                className="px-2 py-1 bg-red-900/20 text-red-400 rounded-full text-xs hover:bg-red-900/30 flex items-center"
-                                                title="Remove period"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
+                                            {period.absentRollNumbers.length > 0 && (
+                                                <p className="text-sm text-[var(--text-dim)] mt-3">
+                                                    Absent: {period.absentRollNumbers.join(', ')}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
+                            );
+                        })}
 
-                                {/* Bulk input for absent roll numbers */}
-                                <div className="mb-3">
-                                    <label className="text-xs text-[var(--text-dim)] block mb-1.5">
-                                        Mark Absent (comma-separated roll numbers)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., 1, 5, 12, 23"
-                                        value={absentInputs[index] || ''}
-                                        onChange={(e) => handleBulkAbsentInput(index, e.target.value)}
-                                        className="input w-full text-sm"
-                                    />
-                                    <p className="text-xs text-[var(--text-dim)] mt-1">
-                                        {(absentees[index] || []).length} student(s) marked absent
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-7 gap-2">
-                                    {[...Array(classStrength)].map((_, i) => {
-                                        const roll = i + 1;
-                                        const isAbsent = (absentees[index] || []).includes(roll);
-
-                                        return (
-                                            <button
-                                                key={roll}
-                                                onClick={() => toggleAbsent(index, roll)}
-                                                className={`grid-box ${isAbsent ? 'absent' : 'present'}`}
-                                            >
-                                                {roll}
-                                            </button>
-                                        );
-                                    })}
+                        {/* Add Period Form */}
+                        {showAddForm ? (
+                            <div className="card border-blue-500/30 bg-blue-900/10">
+                                <h3 className="text-sm uppercase text-blue-400 mb-3">Add New Period</h3>
+                                <div className="flex gap-2">
+                                    {isCustomSubject ? (
+                                        <input
+                                            type="text"
+                                            placeholder="Enter custom subject name..."
+                                            value={newSubjectName}
+                                            onChange={(e) => setNewSubjectName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && addPeriod()}
+                                            className="input flex-1"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <CustomSelect
+                                            options={subjects.map(s => ({
+                                                value: s._id,
+                                                label: s.name,
+                                                subLabel: s.teacherName ? `Teacher: ${s.teacherName}` : 'No Teacher Assigned'
+                                            }))}
+                                            value={selectedSubjectId}
+                                            onChange={(val) => {
+                                                setSelectedSubjectId(val);
+                                                const sub = subjects.find(s => s._id === val);
+                                                setNewSubjectName(sub ? sub.name : '');
+                                            }}
+                                            placeholder="-- Select Subject --"
+                                            className="flex-1 min-w-[200px]"
+                                        />
+                                    )}
+                                    {isCustomSubject && (
+                                        <button
+                                            onClick={() => setIsCustomSubject(false)}
+                                            className="btn btn-ghost px-3 text-xs"
+                                            title="Back to list"
+                                        >
+                                            Use List
+                                        </button>
+                                    )}
+                                    <button onClick={addPeriod} className="btn btn-primary px-4">
+                                        Add
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowAddForm(false);
+                                            setNewSubjectName('');
+                                            setSelectedSubjectId('');
+                                            setIsCustomSubject(false);
+                                        }}
+                                        className="btn btn-outline px-4"
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
                             </div>
-                        ))}
-
-                        {isEditing && (
-                            <div className="text-center mb-6">
-                                <button
-                                    onClick={addPeriod}
-                                    className="btn btn-outline inline-flex w-auto px-6 items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Period
-                                </button>
-                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="w-full py-3 border-2 border-dashed border-white/20 rounded-xl text-[var(--text-dim)] hover:border-white/40 hover:text-white transition flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Period
+                            </button>
                         )}
-                    </>
+                    </div>
                 )}
 
-                {/* Save Button - Absolute positioned */}
-                {timetable.length > 0 && (
-                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
+                {/* Save Button */}
+                {(periods.length > 0 || hasChanges) && (
+                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent">
                         <div className="max-w-4xl mx-auto">
                             <button
-                                onClick={submitAttendance}
-                                className="btn btn-primary w-full flex items-center justify-center gap-2"
+                                onClick={saveAttendance}
+                                disabled={!hasChanges && periods.length === 0}
+                                className={`btn w-full flex items-center justify-center gap-2 ${hasChanges
+                                    ? 'btn-primary'
+                                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                                    }`}
                             >
                                 <Save className="w-4 h-4" />
-                                {getButtonText()}
+                                {hasChanges ? 'Save & Verify' : 'No Changes'}
                             </button>
                         </div>
                     </div>

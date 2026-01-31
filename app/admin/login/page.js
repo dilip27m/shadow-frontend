@@ -17,7 +17,11 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            const res = await api.post('/class/admin-login', { className, adminPin });
+            // Trim inputs to avoid space issues
+            const res = await api.post('/class/admin-login', {
+                className: className.trim(),
+                adminPin: adminPin.trim()
+            });
 
             // SAVE THE TOKEN AND CLASS ID
             localStorage.setItem('adminClassId', res.data.classId);

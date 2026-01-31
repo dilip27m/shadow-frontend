@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
-import { BookOpen, AlertCircle, FileText, Check, X } from 'lucide-react';
+import { BookOpen, FileText, Check, X } from 'lucide-react';
 
 export default function TeacherDashboard() {
     const router = useRouter();
@@ -112,57 +112,19 @@ export default function TeacherDashboard() {
                 {activeTab === 'classes' ? (
                     <div className="space-y-8">
                         {/* Pending Invitations */}
-                        {teacher.assignedClasses.filter(c => c.status === 'Pending').length > 0 && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4 text-orange-400 flex items-center gap-2">
-                                    <AlertCircle className="w-5 h-5" /> Pending Invitations
-                                </h3>
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    {teacher.assignedClasses.filter(c => c.status === 'Pending').map((item, idx) => (
-                                        <div key={idx} className="card border-orange-500/30 bg-orange-900/10">
-                                            <div className="flex flex-col gap-2">
-                                                <h3 className="text-lg font-bold">
-                                                    {item.classId?.className || "Unknown Class"}
-                                                </h3>
-                                                <p className="text-[var(--text-dim)] flex items-center gap-2">
-                                                    <BookOpen className="w-4 h-4" />
-                                                    {item.subjectName}
-                                                </p>
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            await api.post('/teacher/accept-class', {
-                                                                classId: item.classId._id,
-                                                                subjectId: item.subjectId
-                                                            });
-                                                            notify({ message: 'Class Accepted!', type: 'success' });
-                                                            // Refresh dashboard
-                                                            window.location.reload();
-                                                        } catch (err) {
-                                                            notify({ message: 'Failed to accept', type: 'error' });
-                                                        }
-                                                    }}
-                                                    className="btn btn-primary mt-2"
-                                                >
-                                                    Accept Class
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Note: Since PIN is verified during assignment, there are typically no pending invitations */}
+
 
                         {/* Active Classes */}
                         <div>
                             <h3 className="text-xl font-bold mb-4">Your Classes</h3>
                             <div className="grid md:grid-cols-2 gap-6">
-                                {teacher.assignedClasses.filter(c => c.status === 'Accepted').length === 0 ? (
-                                    <p className="text-[var(--text-dim)]">No active classes. Accept pending invitations to get started.</p>
+                                {teacher.assignedClasses.filter(c => c.status === 'Verified' || c.status === 'Accepted').length === 0 ? (
+                                    <p className="text-[var(--text-dim)]">No active classes assigned yet.</p>
                                 ) : (
-                                    teacher.assignedClasses.filter(c => c.status === 'Accepted').map((item, idx) => (
-                                        <div key={idx} className="card hover:border-white/30 transition">
-                                            <div className="flex items-start justify-between">
+                                    teacher.assignedClasses.filter(c => c.status === 'Verified' || c.status === 'Accepted').map((item, idx) => (
+                                        <div key={idx} className="card hover:border-white/30 transition group">
+                                            <div className="flex items-start justify-between mb-4">
                                                 <div>
                                                     <h3 className="text-xl font-bold mb-1">
                                                         {item.classId?.className || "Unknown Class"}
@@ -176,6 +138,13 @@ export default function TeacherDashboard() {
                                                     Active
                                                 </div>
                                             </div>
+
+                                            <button
+                                                onClick={() => router.push(`/teacher/class/${item.classId._id}/${item.subjectId}`)}
+                                                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition text-sm flex items-center justify-center gap-2 group-hover:border-blue-500/50"
+                                            >
+                                                <FileText className="w-4 h-4" /> View Attendance
+                                            </button>
                                         </div>
                                     ))
                                 )}
