@@ -1,17 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, X, AlertTriangle, BookOpen, FileText, Bell, Calendar as CalendarIcon, Trash2, ChevronDown } from 'lucide-react';
+import { Plus, X, BookOpen, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
-
-const TYPE_CONFIG = {
-    deadline: { label: 'Deadline', color: 'red', icon: AlertTriangle, emoji: '⏰' },
-    exam: { label: 'Exam', color: 'orange', icon: FileText, emoji: '📝' },
-    assignment: { label: 'Assignment', color: 'blue', icon: BookOpen, emoji: '📚' },
-    update: { label: 'Update', color: 'green', icon: Bell, emoji: '📢' },
-};
 
 export default function AdminAttention() {
     const router = useRouter();
@@ -22,15 +15,12 @@ export default function AdminAttention() {
     const [announcements, setAnnouncements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [filterType, setFilterType] = useState('all');
 
     // Form state
-    const [formType, setFormType] = useState('update');
     const [formTitle, setFormTitle] = useState('');
     const [formDescription, setFormDescription] = useState('');
     const [formSubjectId, setFormSubjectId] = useState('');
     const [formDueDate, setFormDueDate] = useState('');
-    const [formPriority, setFormPriority] = useState('normal');
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -71,12 +61,10 @@ export default function AdminAttention() {
     };
 
     const resetForm = () => {
-        setFormType('update');
         setFormTitle('');
         setFormDescription('');
         setFormSubjectId('');
         setFormDueDate('');
-        setFormPriority('normal');
         setShowForm(false);
     };
 
@@ -94,13 +82,11 @@ export default function AdminAttention() {
         try {
             await api.post('/announcements', {
                 classId,
-                type: formType,
                 title: formTitle,
                 description: formDescription,
                 subjectId: formSubjectId || null,
                 subjectName: selectedSubject ? selectedSubject.name : 'General',
-                dueDate: formDueDate || null,
-                priority: formPriority
+                dueDate: formDueDate || null
             });
 
             notify({ message: 'Announcement posted!', type: 'success' });
@@ -152,10 +138,6 @@ export default function AdminAttention() {
         return { text: `${diffDays} days left`, color: 'green', urgent: false };
     };
 
-    const filteredAnnouncements = filterType === 'all'
-        ? announcements
-        : announcements.filter(a => a.type === filterType);
-
     if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
 
     return (
@@ -187,32 +169,6 @@ export default function AdminAttention() {
                     <div className="card mb-6 border-blue-500/30 bg-blue-900/5">
                         <h2 className="text-sm uppercase text-blue-400 mb-4">New Announcement</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
-
-                            {/* Type Selection */}
-                            <div>
-                                <label className="text-xs text-[var(--text-dim)] block mb-2">Type</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {Object.entries(TYPE_CONFIG).map(([key, config]) => (
-                                        <button
-                                            key={key}
-                                            type="button"
-                                            onClick={() => setFormType(key)}
-                                            className={`py-2.5 px-3 rounded-lg border text-xs font-medium transition flex flex-col items-center gap-1 ${formType === key
-                                                ? `bg-${config.color}-900/20 border-${config.color}-500/50 text-${config.color}-400`
-                                                : 'bg-[var(--card-bg)] border-[var(--border)] text-[var(--text-dim)] hover:border-white/30'
-                                                }`}
-                                            style={formType === key ? {
-                                                backgroundColor: `color-mix(in srgb, ${config.color === 'red' ? '#ef4444' : config.color === 'orange' ? '#f97316' : config.color === 'blue' ? '#3b82f6' : '#22c55e'} 10%, transparent)`,
-                                                borderColor: `color-mix(in srgb, ${config.color === 'red' ? '#ef4444' : config.color === 'orange' ? '#f97316' : config.color === 'blue' ? '#3b82f6' : '#22c55e'} 50%, transparent)`,
-                                                color: config.color === 'red' ? '#f87171' : config.color === 'orange' ? '#fb923c' : config.color === 'blue' ? '#60a5fa' : '#4ade80'
-                                            } : {}}
-                                        >
-                                            <span className="text-base">{config.emoji}</span>
-                                            {config.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
 
                             {/* Title */}
                             <div>
@@ -265,33 +221,6 @@ export default function AdminAttention() {
                                 </div>
                             </div>
 
-                            {/* Priority */}
-                            <div>
-                                <label className="text-xs text-[var(--text-dim)] block mb-2">Priority</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormPriority('normal')}
-                                        className={`py-2 rounded-lg border text-sm font-medium transition ${formPriority === 'normal'
-                                            ? 'bg-white/10 border-white/30 text-white'
-                                            : 'bg-[var(--card-bg)] border-[var(--border)] text-[var(--text-dim)]'
-                                            }`}
-                                    >
-                                        Normal
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormPriority('urgent')}
-                                        className={`py-2 rounded-lg border text-sm font-medium transition ${formPriority === 'urgent'
-                                            ? 'bg-red-900/20 border-red-500/50 text-red-400'
-                                            : 'bg-[var(--card-bg)] border-[var(--border)] text-[var(--text-dim)]'
-                                            }`}
-                                    >
-                                        🔴 Urgent
-                                    </button>
-                                </div>
-                            </div>
-
                             {/* Submit */}
                             <button
                                 type="submit"
@@ -304,74 +233,25 @@ export default function AdminAttention() {
                     </div>
                 )}
 
-                {/* Filter Tabs */}
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-                    <button
-                        onClick={() => setFilterType('all')}
-                        className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${filterType === 'all'
-                            ? 'bg-white/10 text-white border border-white/20'
-                            : 'bg-[var(--card-bg)] text-[var(--text-dim)] border border-[var(--border)] hover:border-white/30'
-                            }`}
-                    >
-                        All ({announcements.length})
-                    </button>
-                    {Object.entries(TYPE_CONFIG).map(([key, config]) => {
-                        const count = announcements.filter(a => a.type === key).length;
-                        return (
-                            <button
-                                key={key}
-                                onClick={() => setFilterType(key)}
-                                className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition ${filterType === key
-                                    ? 'bg-white/10 text-white border border-white/20'
-                                    : 'bg-[var(--card-bg)] text-[var(--text-dim)] border border-[var(--border)] hover:border-white/30'
-                                    }`}
-                            >
-                                {config.emoji} {config.label} ({count})
-                            </button>
-                        );
-                    })}
-                </div>
-
                 {/* Announcements List */}
-                {filteredAnnouncements.length === 0 ? (
+                {announcements.length === 0 ? (
                     <div className="card text-center py-12">
                         <p className="text-4xl mb-4">📋</p>
                         <p className="text-[var(--text-dim)]">
-                            {announcements.length === 0
-                                ? 'No announcements yet. Post your first one!'
-                                : 'No announcements of this type.'
-                            }
+                            No announcements yet. Post your first one!
                         </p>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {filteredAnnouncements.map(announcement => {
-                            const config = TYPE_CONFIG[announcement.type] || TYPE_CONFIG.update;
+                        {announcements.map(announcement => {
                             const dueStatus = getDueStatus(announcement.dueDate);
-                            const Icon = config.icon;
 
                             return (
                                 <div
                                     key={announcement._id}
-                                    className={`card relative ${announcement.priority === 'urgent' ? 'border-red-500/40' : ''}`}
+                                    className="card relative"
                                 >
-                                    {/* Urgent badge */}
-                                    {announcement.priority === 'urgent' && (
-                                        <div className="absolute top-3 right-3 flex items-center gap-1">
-                                            <span className="relative flex h-2.5 w-2.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                            </span>
-                                            <span className="text-xs text-red-400 font-medium">URGENT</span>
-                                        </div>
-                                    )}
-
                                     <div className="flex gap-3">
-                                        {/* Type Icon */}
-                                        <div className="flex-shrink-0 mt-0.5 text-xl">
-                                            {config.emoji}
-                                        </div>
-
                                         {/* Content */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-2 mb-1">
@@ -384,10 +264,6 @@ export default function AdminAttention() {
 
                                             {/* Tags Row */}
                                             <div className="flex flex-wrap items-center gap-2">
-                                                {/* Type tag */}
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[var(--text-dim)]">
-                                                    {config.label}
-                                                </span>
                                                 {/* Subject tag */}
                                                 <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/20 border border-blue-500/20 text-blue-400">
                                                     {announcement.subjectName}
@@ -395,9 +271,9 @@ export default function AdminAttention() {
                                                 {/* Due date */}
                                                 {dueStatus && (
                                                     <span className={`text-xs px-2 py-0.5 rounded-full border ${dueStatus.color === 'red' ? 'bg-red-900/20 border-red-500/30 text-red-400' :
-                                                            dueStatus.color === 'orange' ? 'bg-orange-900/20 border-orange-500/30 text-orange-400' :
-                                                                dueStatus.color === 'yellow' ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400' :
-                                                                    'bg-green-900/20 border-green-500/30 text-green-400'
+                                                        dueStatus.color === 'orange' ? 'bg-orange-900/20 border-orange-500/30 text-orange-400' :
+                                                            dueStatus.color === 'yellow' ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400' :
+                                                                'bg-green-900/20 border-green-500/30 text-green-400'
                                                         }`}>
                                                         {dueStatus.text}
                                                     </span>

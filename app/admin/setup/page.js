@@ -44,8 +44,8 @@ export default function CreateClass() {
             localStorage.setItem('adminClassId', res.data.classId);
             localStorage.setItem('token', res.data.token);
 
-            notify({ message: `Class "${formData.className}" created! Setting up timetable...`, type: 'success' });
-            setTimeout(() => router.push('/admin/timetable'), 1500);
+            notify({ message: `Class "${formData.className}" created! Add your subjects...`, type: 'success' });
+            setTimeout(() => router.push('/admin/subjects'), 1500);
         } catch (err) {
             if (err.response?.data?.error) {
                 notify({ message: err.response.data.error, type: 'error' });

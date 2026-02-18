@@ -14,15 +14,17 @@ export default function StudentDashboard() {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [minPercentage, setMinPercentage] = useState(75);
   const [announcementCount, setAnnouncementCount] = useState(0);
+  const [allAnnouncements, setAllAnnouncements] = useState([]);
 
-  // History Modal
+  // History/Works Modal
   const [historyModal, setHistoryModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [modalTab, setModalTab] = useState('history'); // 'history' | 'works'
 
   // Report Issue Modal State
   const [reportModal, setReportModal] = useState(false);
@@ -59,9 +61,21 @@ export default function StudentDashboard() {
     }
   };
 
-  const fetchData = async (showRefresh = false) => {
+  const getDeadlineStatus = (dueDate) => {
+    if (!dueDate) return null;
+    const now = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffTime < 0) return { text: `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`, type: 'danger', days: diffDays };
+    if (diffDays === 0) return { text: 'Due Today', type: 'urgent', days: 0 };
+    if (diffDays === 1) return { text: 'Due Tomorrow', type: 'warning', days: 1 };
+    return { text: `${diffDays} days left`, type: 'safe', days: diffDays };
+  };
+
+  const fetchData = async () => {
     if (!classId || !rollNumber) return;
-    if (showRefresh) setRefreshing(true);
 
     try {
       const [reportRes, reportsRes, announcementsRes] = await Promise.allSettled([
@@ -82,19 +96,22 @@ export default function StudentDashboard() {
 
       if (announcementsRes.status === 'fulfilled') {
         const announcements = announcementsRes.value.data.announcements || [];
-        // Count recent announcements (last 24h)
+        setAllAnnouncements(announcements);
+
+        // Count urgent announcements (due in next 24h)
         const now = new Date();
-        const recentCount = announcements.filter(a => {
-          const created = new Date(a.createdAt);
-          return (now - created) < 86400000;
+        const urgentCount = announcements.filter(a => {
+          if (!a.dueDate) return false;
+          const due = new Date(a.dueDate);
+          const diff = due - now;
+          return diff > 0 && diff < 86400000;
         }).length;
-        setAnnouncementCount(recentCount);
+        setAnnouncementCount(urgentCount);
       }
     } catch (err) {
       console.error("Fetch Error:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -112,6 +129,8 @@ export default function StudentDashboard() {
   const fetchHistory = async (subjectId, subjectName) => {
     setHistoryModal(true);
     setSelectedSubject(subjectName);
+    setSelectedSubjectId(subjectId);
+    setModalTab('history'); // Reset to history tab by default
     setHistoryLoading(true);
     setHistoryData([]);
 
@@ -120,7 +139,8 @@ export default function StudentDashboard() {
       setHistoryData(res.data.history);
     } catch (err) {
       notify({ message: "Failed to load history", type: 'error' });
-      setHistoryModal(false);
+      // Keep modal open so they can switch to works if needed
+      setHistoryLoading(false);
     } finally {
       setHistoryLoading(false);
     }
@@ -161,17 +181,22 @@ export default function StudentDashboard() {
     }
   };
 
+  // Get urgent deadlines (Due within 24h)
+  const urgentTasks = allAnnouncements.filter(a => {
+    if (!a.dueDate) return false;
+    const due = new Date(a.dueDate);
+    const now = new Date();
+    const diff = due - now;
+    return diff > 0 && diff < 86400000; // Positive and less than 24h
+  });
+
+  // Get subject specific works
+  const subjectWorks = selectedSubjectId
+    ? allAnnouncements.filter(a => a.subjectId === selectedSubjectId || a.subjectName === selectedSubject)
+    : [];
+
   if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading Report...</div>;
   if (!data) return <div className="flex h-screen items-center justify-center text-[var(--text-dim)]">Student Not Found</div>;
-
-  // Calculate overall stats
-  const totalAttended = data.subjects?.reduce((sum, s) => sum + s.attended, 0) || 0;
-  const totalClasses = data.subjects?.reduce((sum, s) => sum + s.total, 0) || 0;
-  const overallPercentage = totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0;
-  const worstSubject = data.subjects?.length > 0
-    ? data.subjects.reduce((worst, s) => s.percentage < worst.percentage ? s : worst, data.subjects[0])
-    : null;
-  const subjectsAtRisk = data.subjects?.filter(s => s.percentage < minPercentage).length || 0;
 
   return (
     <>
@@ -185,7 +210,7 @@ export default function StudentDashboard() {
 
       <div className="max-w-2xl mx-auto px-4 py-8">
 
-        {/* Header with refresh */}
+        {/* Header */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <div>
@@ -199,55 +224,42 @@ export default function StudentDashboard() {
                 </p>
               )}
             </div>
-            <button
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              className="p-2 rounded-full border border-[var(--border)] hover:border-white/50 transition"
-              title="Refresh data"
-            >
-              <svg
-                className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            </button>
           </div>
         </div>
 
-        {/* Overall Summary Card */}
-        <div className="card mb-6 bg-gradient-to-br from-white/5 to-transparent border-white/15">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className={`text-3xl font-bold ${overallPercentage >= minPercentage ? 'text-green-400' : 'text-red-400'}`}>
-                {overallPercentage.toFixed(1)}%
-              </p>
-              <p className="text-xs text-[var(--text-dim)] mt-1">Overall</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold">{totalAttended}<span className="text-lg text-[var(--text-dim)]">/{totalClasses}</span></p>
-              <p className="text-xs text-[var(--text-dim)] mt-1">Attended</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold">{data.subjects?.length || 0}</p>
-              <p className="text-xs text-[var(--text-dim)] mt-1">Subjects</p>
+        {/* Urgent Deadlines (Due in 24h) */}
+        {urgentTasks.length > 0 && (
+          <div className="card mb-6 bg-gradient-to-br from-red-900/10 to-transparent border-red-500/30">
+            <h2 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              Urgent Tasks (Due in 24h)
+            </h2>
+
+            <div className="space-y-3">
+              {urgentTasks.map(task => {
+                const status = getDeadlineStatus(task.dueDate);
+                return (
+                  <div key={task._id} className="p-3 rounded bg-[var(--bg)] border border-[var(--border)] relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
+                    <div className="flex justify-between items-start mb-1 pl-2">
+                      <span className="font-semibold text-sm">{task.title}</span>
+                      <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                        {status?.text}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-dim)] line-clamp-2 pl-2">{task.description}</p>
+                    <p className="text-[10px] text-[var(--text-dim)] mt-2 pl-2">
+                      {task.subjectName || 'General'}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          {subjectsAtRisk > 0 && (
-            <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center gap-2 flex-wrap">
-              <span className="text-xs px-2 py-1 rounded-full bg-red-900/30 text-red-400 border border-red-500/30 font-medium">
-                ⚠ {subjectsAtRisk} subject{subjectsAtRisk > 1 ? 's' : ''} below {minPercentage}%
-              </span>
-              {worstSubject && worstSubject.percentage < minPercentage && (
-                <span className="text-xs text-[var(--text-dim)]">
-                  Weakest: {worstSubject.subjectName} ({worstSubject.percentage.toFixed(1)}%)
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Minimum Attendance Slider */}
         <div className="card mb-6">
@@ -283,7 +295,7 @@ export default function StudentDashboard() {
             const bunkInfo = getBunkMessage(sub.attended, sub.total, percentage);
 
             return (
-              <div key={idx} className="card relative group">
+              <div key={idx} className="card relative group hover:border-[var(--text-dim)] transition-colors cursor-pointer" onClick={() => fetchHistory(sub._id, sub.subjectName)}>
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-lg font-semibold">{sub.subjectName}</h2>
                   <span className={`px-3 py-1 rounded-md text-sm font-semibold ${isSafe ? 'bg-[var(--success)] text-[var(--success-text)]' : 'bg-[var(--danger)] text-[var(--danger-text)]'
@@ -303,7 +315,6 @@ export default function StudentDashboard() {
                   </div>
                 </div>
 
-                {/* Progress bar */}
                 <div className="mb-3">
                   <div className="h-1.5 bg-[var(--bg)] rounded-full overflow-hidden relative">
                     <div
@@ -312,27 +323,23 @@ export default function StudentDashboard() {
                     ></div>
                     <div
                       className={`h-full rounded-full transition-all ${bunkInfo.type === 'safe' ? 'bg-green-500' :
-                          bunkInfo.type === 'danger' ? 'bg-red-500' :
-                            'bg-orange-500'
+                        bunkInfo.type === 'danger' ? 'bg-red-500' :
+                          'bg-orange-500'
                         }`}
                       style={{ width: `${Math.min(100, percentage)}%` }}
                     ></div>
                   </div>
                 </div>
 
-                <p className={`text-sm italic mb-4 ${bunkInfo.type === 'safe' ? 'text-green-400/80' :
-                    bunkInfo.type === 'danger' ? 'text-red-400/80' :
-                      'text-orange-400/80'
+                <p className={`text-sm italic mb-1 ${bunkInfo.type === 'safe' ? 'text-green-400/80' :
+                  bunkInfo.type === 'danger' ? 'text-red-400/80' :
+                    'text-orange-400/80'
                   }`}>
                   {bunkInfo.text}
                 </p>
-
-                <button
-                  onClick={() => fetchHistory(sub._id, sub.subjectName)}
-                  className="w-full py-2 rounded-md border border-[var(--border)] text-sm text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
-                >
-                  View Detailed History
-                </button>
+                <p className="text-xs text-[var(--text-dim)] text-right mt-2 flex items-center justify-end gap-1 group-hover:text-white transition-colors">
+                  Tap for Details & Tasks →
+                </p>
               </div>
             );
           }) || <p className="text-[var(--text-dim)] text-center">No subjects found</p>}
@@ -371,13 +378,13 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* --- History Modal --- */}
+        {/* --- History & Works Modal --- */}
         {historyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-[#0a0a0a] border border-[#333] w-full max-w-md rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
 
               <div className="p-4 border-b border-[#333] flex justify-between items-center bg-[#0a0a0a]">
-                <h3 className="font-bold text-lg">{selectedSubject} History</h3>
+                <h3 className="font-bold text-lg">{selectedSubject}</h3>
                 <button
                   onClick={() => setHistoryModal(false)}
                   className="text-[var(--text-dim)] hover:text-white text-xl leading-none"
@@ -386,41 +393,87 @@ export default function StudentDashboard() {
                 </button>
               </div>
 
-              <div className="overflow-y-auto p-4 flex-1">
-                {historyLoading ? (
-                  <div className="text-center py-8 text-[var(--text-dim)] animate-pulse">Loading records...</div>
-                ) : historyData.length === 0 ? (
-                  <div className="text-center py-8 text-[var(--text-dim)]">No classes recorded yet.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {historyData.map((record, i) => (
-                      <div key={i} className="flex justify-between items-center p-3 rounded bg-[#111] border border-[#222]">
-                        <span className="text-sm text-gray-300">
-                          {new Date(record.date).toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </span>
-                        <span className={`text-sm font-medium px-2 py-0.5 rounded ${record.status === 'Present'
-                          ? 'text-green-400 bg-green-400/10'
-                          : 'text-red-400 bg-red-400/10'
-                          }`}>
-                          {record.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Modal Tabs */}
+              <div className="flex border-b border-[#333]">
+                <button
+                  onClick={() => setModalTab('history')}
+                  className={`flex-1 py-3 text-sm font-medium transition ${modalTab === 'history' ? 'bg-[#1a1a1a] text-white border-b-2 border-blue-500' : 'text-[var(--text-dim)] hover:bg-[#111]'}`}
+                >
+                  Attendance History
+                </button>
+                <button
+                  onClick={() => setModalTab('works')}
+                  className={`flex-1 py-3 text-sm font-medium transition ${modalTab === 'works' ? 'bg-[#1a1a1a] text-white border-b-2 border-blue-500' : 'text-[var(--text-dim)] hover:bg-[#111]'}`}
+                >
+                  Works & Tasks
+                </button>
               </div>
 
-              <div className="p-4 border-t border-[#333] bg-[#0a0a0a]">
-                <button
-                  onClick={() => setHistoryModal(false)}
-                  className="w-auto py-2 bg-white text-black font-medium rounded-full active:scale-95 transition-transform text-sm"
-                >
-                  Close
-                </button>
+              <div className="overflow-y-auto p-4 flex-1">
+
+                {modalTab === 'history' && (
+                  <>
+                    {historyLoading ? (
+                      <div className="text-center py-8 text-[var(--text-dim)] animate-pulse">Loading records...</div>
+                    ) : historyData.length === 0 ? (
+                      <div className="text-center py-8 text-[var(--text-dim)]">No classes recorded yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {historyData.map((record, i) => (
+                          <div key={i} className="flex justify-between items-center p-3 rounded bg-[#111] border border-[#222]">
+                            <span className="text-sm text-gray-300">
+                              {new Date(record.date).toLocaleDateString('en-US', {
+                                weekday: 'short', month: 'short', day: 'numeric'
+                              })}
+                            </span>
+                            <span className={`text-sm font-medium px-2 py-0.5 rounded ${record.status === 'Present'
+                              ? 'text-green-400 bg-green-400/10'
+                              : 'text-red-400 bg-red-400/10'
+                              }`}>
+                              {record.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {modalTab === 'works' && (
+                  <div className="space-y-3">
+                    {subjectWorks.length === 0 ? (
+                      <div className="text-center py-8 text-[var(--text-dim)]">
+                        <p>No assignments or notices for this subject.</p>
+                      </div>
+                    ) : (
+                      subjectWorks.map((work) => {
+                        const status = getDeadlineStatus(work.dueDate);
+                        return (
+                          <div key={work._id} className="card p-3 border border-[#333]">
+                            <div className="flex justify-between items-start mb-1">
+                              <h4 className="font-semibold text-sm">{work.title}</h4>
+                              {status && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${status.type === 'danger' ? 'bg-red-900/40 text-red-400' :
+                                    status.type === 'urgent' ? 'bg-orange-900/40 text-orange-400' :
+                                      status.type === 'warning' ? 'bg-yellow-900/40 text-yellow-400' :
+                                        'bg-green-900/40 text-green-400'
+                                  }`}>
+                                  {status.text}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[var(--text-dim)] mb-2">{work.description}</p>
+                            <div className="flex justify-between items-center text-[10px] text-[var(--text-dim)] border-t border-[#222] pt-2">
+                              <span className="bg-[#222] px-2 py-0.5 rounded uppercase font-bold tracking-wider">{work.type}</span>
+                              <span>Posted {new Date(work.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
               </div>
 
             </div>
@@ -530,9 +583,6 @@ export default function StudentDashboard() {
                       <p className="text-sm text-[var(--text-dim)]">{report.adminResponse}</p>
                     </div>
                   )}
-                  <p className="text-xs text-[var(--text-dim)] mt-2">
-                    Submitted {new Date(report.createdAt).toLocaleDateString()}
-                  </p>
                 </div>
               ))}
             </div>

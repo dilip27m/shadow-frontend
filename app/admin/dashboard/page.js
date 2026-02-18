@@ -15,7 +15,7 @@ export default function AdminDashboard() {
     const router = useRouter();
     const notify = useNotification();
     const [loading, setLoading] = useState(true);
-    const [timetable, setTimetable] = useState([]);
+    const [periods, setPeriods] = useState([]);
     const [classId, setClassId] = useState(null);
     const [className, setClassName] = useState('');
     const [selectedDate, setSelectedDate] = useState('');
@@ -30,8 +30,7 @@ export default function AdminDashboard() {
     const [classStrength, setClassStrength] = useState(70);
     const [saving, setSaving] = useState(false);
     const [pendingReports, setPendingReports] = useState(0);
-    const [savedTimetable, setSavedTimetable] = useState(null); // weekly timetable from class data
-    const [timetableLoaded, setTimetableLoaded] = useState(false); // whether today's schedule was auto-loaded
+    const [confirmRemovePeriod, setConfirmRemovePeriod] = useState(null);
 
     // Check if viewing past date
     const checkIfPastDate = (date) => {
@@ -45,34 +44,13 @@ export default function AdminDashboard() {
         return date.toLocaleDateString('en-US', { weekday: 'long' });
     };
 
-    // Auto-load timetable from saved weekly schedule
-    const loadTimetableForDay = useCallback((dateStr, weeklyTimetable, subjectsList) => {
-        if (!weeklyTimetable || !subjectsList) return [];
-
-        const dayName = getDayName(dateStr);
-        const daySchedule = weeklyTimetable[dayName] || [];
-
-        if (daySchedule.length === 0) return [];
-
-        return daySchedule
-            .sort((a, b) => a.period - b.period)
-            .map(slot => {
-                const subject = subjectsList.find(s => s._id === slot.subjectId);
-                return {
-                    period: slot.period,
-                    subjectId: slot.subjectId || '',
-                    subjectName: subject ? subject.name : ''
-                };
-            });
-    }, []);
-
     // Load attendance for selected date
-    const loadAttendanceForDate = useCallback(async (date, cId, weeklyTT, subjectsList) => {
+    const loadAttendanceForDate = useCallback(async (date, cId) => {
         try {
             const res = await api.get(`/attendance/by-date/${cId}/${date}`);
             if (res.data && res.data.periods && res.data.periods.length > 0) {
                 // Load saved attendance
-                const formattedTimetable = res.data.periods.map(period => ({
+                const formattedPeriods = res.data.periods.map(period => ({
                     period: period.periodNum,
                     subjectName: period.subjectName,
                     subjectId: period.subjectId
@@ -85,35 +63,31 @@ export default function AdminDashboard() {
                     newAbsentInputs[index] = (period.absentRollNumbers || []).sort((a, b) => a - b).join(', ');
                 });
 
-                setTimetable(formattedTimetable);
+                setPeriods(formattedPeriods);
                 setAbsentees(newAbsentees);
                 setAbsentInputs(newAbsentInputs);
                 setHasModifications(false);
-                setTimetableLoaded(true);
 
                 if (res.data.updatedAt) {
                     setLastModified(new Date(res.data.updatedAt));
                 }
             } else {
-                // No attendance for this date — auto-load from weekly schedule
-                const autoSchedule = loadTimetableForDay(date, weeklyTT, subjectsList);
-                setTimetable(autoSchedule);
+                // No attendance for this date — DO NOT auto-load (User request)
+                setPeriods([]);
                 setAbsentees({});
                 setAbsentInputs({});
                 setHasModifications(false);
                 setLastModified(null);
-                setTimetableLoaded(autoSchedule.length > 0);
             }
         } catch (err) {
-            const autoSchedule = loadTimetableForDay(date, weeklyTT, subjectsList);
-            setTimetable(autoSchedule);
+            // Error fetching attendance — reset to empty
+            setPeriods([]);
             setAbsentees({});
             setAbsentInputs({});
             setHasModifications(false);
             setLastModified(null);
-            setTimetableLoaded(autoSchedule.length > 0);
         }
-    }, [loadTimetableForDay]);
+    }, []);
 
     useEffect(() => {
         const storedClassId = localStorage.getItem('adminClassId');
@@ -134,12 +108,10 @@ export default function AdminDashboard() {
             api.get(`/reports/class/${storedClassId}`).catch(() => ({ data: { reports: [] } })),
         ]).then(([classRes, datesRes, reportsRes]) => {
             const subjectsList = classRes.data.subjects;
-            const weeklyTT = classRes.data.timetable;
 
             setSubjects(subjectsList);
             setClassName(classRes.data.className);
             setClassStrength(classRes.data.totalStudents || 70);
-            setSavedTimetable(weeklyTT);
 
             // Format attendance dates
             const formattedDates = (datesRes.data.dates || []).map(dateStr => {
@@ -154,7 +126,7 @@ export default function AdminDashboard() {
             setLoading(false);
 
             // Load attendance for today
-            loadAttendanceForDate(today, storedClassId, weeklyTT, subjectsList);
+            loadAttendanceForDate(today, storedClassId);
         }).catch(() => {
             setLoading(false);
         });
@@ -162,12 +134,12 @@ export default function AdminDashboard() {
 
     // Load attendance when date changes
     useEffect(() => {
-        if (classId && selectedDate && savedTimetable && subjects.length > 0) {
-            loadAttendanceForDate(selectedDate, classId, savedTimetable, subjects);
+        if (classId && selectedDate && subjects.length > 0) {
+            loadAttendanceForDate(selectedDate, classId);
             checkIfPastDate(selectedDate);
             setShowCalendar(false);
         }
-    }, [selectedDate, classId, savedTimetable, subjects, loadAttendanceForDate]);
+    }, [selectedDate, classId, subjects, loadAttendanceForDate]);
 
     const handleLogout = () => {
         localStorage.removeItem('adminClassId');
@@ -176,18 +148,24 @@ export default function AdminDashboard() {
     };
 
     const addPeriod = () => {
-        const nextPeriodNum = timetable.length > 0
-            ? Math.max(...timetable.map(p => p.period)) + 1
+        const nextPeriodNum = periods.length > 0
+            ? Math.max(...periods.map(p => p.period)) + 1
             : 1;
-        setTimetable([...timetable, { period: nextPeriodNum, subjectId: "", subjectName: "" }]);
+        setPeriods([...periods, { period: nextPeriodNum, subjectId: "", subjectName: "" }]);
         setHasModifications(true);
     };
 
-    const removePeriod = (periodNum) => {
-        const indexToRemove = timetable.findIndex(p => p.period === periodNum);
+    const requestRemovePeriod = (periodNum) => {
+        setConfirmRemovePeriod(periodNum);
+    };
+
+    const confirmAndRemovePeriod = () => {
+        if (confirmRemovePeriod === null) return;
+        const periodNum = confirmRemovePeriod;
+        const indexToRemove = periods.findIndex(p => p.period === periodNum);
         if (indexToRemove === -1) return;
 
-        setTimetable(prev => prev.filter(p => p.period !== periodNum));
+        setPeriods(prev => prev.filter(p => p.period !== periodNum));
 
         const shiftState = (prev) => {
             const updated = {};
@@ -203,11 +181,17 @@ export default function AdminDashboard() {
         setAbsentees(shiftState);
         setAbsentInputs(shiftState);
         setHasModifications(true);
+        setConfirmRemovePeriod(null);
+        notify({ message: `Period P${periodNum} removed`, type: 'success' });
+    };
+
+    const cancelRemovePeriod = () => {
+        setConfirmRemovePeriod(null);
     };
 
     const updatePeriod = (periodNum, subjectId) => {
         const subject = subjects.find(s => s._id === subjectId);
-        setTimetable(prev => prev.map(slot =>
+        setPeriods(prev => prev.map(slot =>
             slot.period === periodNum
                 ? { ...slot, subjectId, subjectName: subject ? subject.name : "" }
                 : slot
@@ -271,20 +255,20 @@ export default function AdminDashboard() {
             [periodIdx]: prevAbsentees.sort((a, b) => a - b).join(', ')
         }));
         setHasModifications(true);
-        notify({ message: `Copied ${prevAbsentees.length} absentee(s) from P${timetable[periodIdx - 1]?.period || periodIdx}`, type: 'success' });
+        notify({ message: `Copied ${prevAbsentees.length} absentee(s) from P${periods[periodIdx - 1]?.period || periodIdx}`, type: 'success' });
     };
 
     const submitAttendance = async () => {
         if (!classId) return;
 
-        const validPeriods = timetable.filter(slot => slot.subjectId);
+        const validPeriods = periods.filter(slot => slot.subjectId);
         if (validPeriods.length === 0) {
             notify({ message: "Please add at least one class with a subject selected", type: 'error' });
             return;
         }
 
         setSaving(true);
-        const formattedPeriods = timetable.map((slot, index) => ({
+        const formattedPeriods = periods.map((slot, index) => ({
             periodNum: slot.period,
             subjectId: slot.subjectId,
             subjectName: slot.subjectName,
@@ -310,7 +294,7 @@ export default function AdminDashboard() {
                 })
                 .catch(() => { });
 
-            loadAttendanceForDate(selectedDate, classId, savedTimetable, subjects);
+            loadAttendanceForDate(selectedDate, classId);
         } catch (err) {
             notify({ message: "Failed to save attendance", type: 'error' });
         } finally {
@@ -338,9 +322,7 @@ export default function AdminDashboard() {
         });
     };
 
-    // Get total counts for the header
-    const totalAbsent = Object.values(absentees).reduce((sum, arr) => sum + (arr?.length || 0), 0);
-    const totalPresent = timetable.length > 0 ? (timetable.length * classStrength) - totalAbsent : 0;
+
 
     if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
 
@@ -371,23 +353,7 @@ export default function AdminDashboard() {
                         )}
                     </div>
 
-                    {/* Quick stats row */}
-                    {timetable.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                            <div className="glass-card !p-3 text-center !rounded-xl">
-                                <p className="text-lg font-bold">{timetable.length}</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Periods</p>
-                            </div>
-                            <div className="glass-card !p-3 text-center !rounded-xl">
-                                <p className="text-lg font-bold text-emerald-400">{totalPresent}</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Present</p>
-                            </div>
-                            <div className="glass-card !p-3 text-center !rounded-xl">
-                                <p className={`text-lg font-bold ${totalAbsent > 0 ? 'text-red-400' : 'text-[var(--text-dim)]'}`}>{totalAbsent}</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Absent</p>
-                            </div>
-                        </div>
-                    )}
+
 
                     {lastModified && (
                         <div className="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
@@ -430,23 +396,15 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {/* ─── Timetable auto-load notice ─── */}
-                {timetable.length > 0 && !lastModified && timetableLoaded && (
-                    <div className="flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl bg-blue-950/20 border border-blue-500/15 text-xs text-blue-400">
-                        <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>Timetable auto-loaded for {getDayName(selectedDate)}. Mark absentees below.</span>
-                    </div>
-                )}
-
                 {/* ─── Period Cards ─── */}
-                {timetable.length > 0 && (
+                {periods.length > 0 && (
                     <div className="space-y-4">
-                        {timetable.map((slot, index) => {
+                        {periods.map((slot, index) => {
                             const absentCount = (absentees[index] || []).length;
                             const presentCount = classStrength - absentCount;
 
                             return (
-                                <div key={index} className="card animate-fade-in">
+                                <div key={index} className="card animate-fade-in" style={{ position: 'relative', overflow: 'hidden' }}>
                                     {/* Period header */}
                                     <div className="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border)]">
                                         <div className="flex items-center gap-3">
@@ -473,7 +431,7 @@ export default function AdminDashboard() {
                                                 {absentCount > 0 ? `${absentCount} absent` : 'All present'}
                                             </span>
                                             <button
-                                                onClick={() => removePeriod(slot.period)}
+                                                onClick={() => requestRemovePeriod(slot.period)}
                                                 className="w-8 h-8 bg-red-500/10 text-red-400 rounded-lg text-xs hover:bg-red-500/20 flex items-center justify-center transition"
                                                 title="Remove period"
                                             >
@@ -481,6 +439,69 @@ export default function AdminDashboard() {
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* ─── Remove Confirmation Overlay ─── */}
+                                    {confirmRemovePeriod === slot.period && (
+                                        <div className="animate-fade-in rounded-xl" style={{
+                                            position: 'absolute',
+                                            inset: 0,
+                                            background: 'rgba(0, 0, 0, 0.85)',
+                                            backdropFilter: 'blur(4px)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '1rem',
+                                            zIndex: 10,
+                                            borderRadius: 'inherit',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <AlertTriangle className="w-5 h-5 text-red-400" />
+                                                <p style={{ color: 'white', fontWeight: 600, fontSize: '0.95rem' }}>
+                                                    Remove Period P{slot.period}?
+                                                </p>
+                                            </div>
+                                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
+                                                {slot.subjectName ? `${slot.subjectName} — ` : ''}This action cannot be undone
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelRemovePeriod}
+                                                    style={{
+                                                        padding: '0.5rem 1.5rem',
+                                                        borderRadius: '9999px',
+                                                        border: '1px solid rgba(255,255,255,0.15)',
+                                                        background: 'transparent',
+                                                        color: 'white',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 500,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={confirmAndRemovePeriod}
+                                                    style={{
+                                                        padding: '0.5rem 1.5rem',
+                                                        borderRadius: '9999px',
+                                                        border: '1px solid rgba(239,68,68,0.4)',
+                                                        background: 'rgba(239,68,68,0.15)',
+                                                        color: '#f87171',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                    }}
+                                                >
+                                                    Yes, Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Quick actions */}
                                     <div className="flex items-center gap-2 mb-3">
@@ -497,7 +518,7 @@ export default function AdminDashboard() {
                                                 className="text-xs px-3 py-1.5 rounded-full border border-white/10 text-[var(--text-dim)] hover:text-white hover:border-white/20 transition flex items-center gap-1.5"
                                             >
                                                 <RotateCcw className="w-3 h-3" />
-                                                Copy P{timetable[index - 1]?.period}
+                                                Copy P{periods[index - 1]?.period}
                                             </button>
                                         )}
                                     </div>
@@ -545,16 +566,16 @@ export default function AdminDashboard() {
                         <Plus className="w-4 h-4" />
                         Add Period
                     </button>
-                    {timetable.length === 0 && !timetableLoaded && (
+                    {periods.length === 0 && (
                         <p className="text-[var(--text-dim)] text-sm mt-4">
                             No classes scheduled for {getDayName(selectedDate)}.<br />
-                            <span className="text-xs">Tap "Add Period" to manually add classes, or set up your weekly timetable first.</span>
+                            <span className="text-xs">Tap "Add Period" to manually add classes.</span>
                         </p>
                     )}
                 </div>
 
                 {/* ─── Save Button — Fixed at bottom ─── */}
-                {timetable.length > 0 && (
+                {periods.length > 0 && (
                     <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent z-50">
                         <div className="max-w-4xl mx-auto">
                             <button

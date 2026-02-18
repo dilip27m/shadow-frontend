@@ -19,7 +19,20 @@ export default function AdminLogin() {
         const storedClassId = localStorage.getItem('adminClassId');
         const storedToken = localStorage.getItem('token');
         if (storedClassId && storedToken) {
-            router.push('/admin/dashboard');
+            // Verify token is still valid and renew it
+            api.post('/class/verify-token')
+                .then(res => {
+                    // Token is valid — renew it silently and redirect
+                    localStorage.setItem('token', res.data.token);
+                    localStorage.setItem('adminClassId', res.data.classId);
+                    router.push('/admin/dashboard');
+                })
+                .catch(() => {
+                    // Token expired or invalid — clear and show login
+                    localStorage.removeItem('adminClassId');
+                    localStorage.removeItem('token');
+                    setCheckingSession(false);
+                });
         } else {
             setCheckingSession(false);
         }

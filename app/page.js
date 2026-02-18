@@ -52,12 +52,10 @@ export default function Home() {
     const [rollNumber, setRollNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({ totalClasses: 0, totalStudents: 0 });
-    const [savedAdmin, setSavedAdmin] = useState(null);
-    const [savedStudent, setSavedStudent] = useState(null);
+    const [sessionChecked, setSessionChecked] = useState(false);
     const [activeTab, setActiveTab] = useState('student');
 
-    const classCounter = useCounter(stats.totalClasses);
-    const studentCounter = useCounter(stats.totalStudents);
+
 
     useEffect(() => {
         const adminClassId = localStorage.getItem('adminClassId');
@@ -65,28 +63,41 @@ export default function Home() {
         const studentClassId = localStorage.getItem('studentClassId');
         const studentRoll = localStorage.getItem('studentRoll');
 
+        // Auto-redirect: Admin with valid token
         if (adminClassId && adminToken) {
-            api.get(`/class/${adminClassId}`)
-                .then(res => setSavedAdmin({ classId: adminClassId, className: res.data.className }))
+            api.post('/class/verify-token')
+                .then(res => {
+                    // Token is valid — renew and redirect
+                    localStorage.setItem('token', res.data.token);
+                    localStorage.setItem('adminClassId', res.data.classId);
+                    router.push('/admin/dashboard');
+                })
                 .catch(() => {
                     localStorage.removeItem('adminClassId');
                     localStorage.removeItem('token');
+                    setSessionChecked(true);
                 });
+            return; // Don't check student — admin takes priority
         }
 
+        // Auto-redirect: Returning student
         if (studentClassId && studentRoll) {
             api.get(`/class/${studentClassId}`)
-                .then(res => setSavedStudent({
-                    classId: studentClassId,
-                    rollNumber: studentRoll,
-                    className: res.data.className
-                }))
+                .then(res => {
+                    // Class still exists — redirect to student dashboard
+                    router.push(`/student/${studentClassId}/${studentRoll}`);
+                })
                 .catch(() => {
                     localStorage.removeItem('studentClassId');
                     localStorage.removeItem('studentRoll');
                     localStorage.removeItem('studentClassName');
+                    setSessionChecked(true);
                 });
+            return;
         }
+
+        // No saved session — show landing page
+        setSessionChecked(true);
 
         api.get('/class/stats/all')
             .then(res => setStats(res.data))
@@ -109,59 +120,11 @@ export default function Home() {
         }
     };
 
-    const features = [
-        {
-            icon: Calendar,
-            title: 'Smart Calendar',
-            desc: 'Navigate through months, view daily breakdowns, and spot attendance patterns at a glance.',
-            color: 'blue',
-            gradient: 'from-blue-500/20 to-blue-600/5',
-        },
-        {
-            icon: TrendingUp,
-            title: 'Live Analytics',
-            desc: 'Real-time percentage tracking per subject with visual progress bars and color alerts.',
-            color: 'emerald',
-            gradient: 'from-emerald-500/20 to-emerald-600/5',
-        },
-        {
-            icon: Zap,
-            title: 'Bunk Calculator',
-            desc: 'Know exactly how many classes you can skip while staying above the minimum threshold.',
-            color: 'amber',
-            gradient: 'from-amber-500/20 to-amber-600/5',
-        },
-        {
-            icon: BarChart3,
-            title: 'Admin Dashboard',
-            desc: 'One-tap attendance marking with smart timetable auto-loading and bulk input support.',
-            color: 'purple',
-            gradient: 'from-purple-500/20 to-purple-600/5',
-        },
-        {
-            icon: Bell,
-            title: 'Announcements',
-            desc: 'Admins can post class-wide announcements. Students get notified with a live badge counter.',
-            color: 'rose',
-            gradient: 'from-rose-500/20 to-rose-600/5',
-        },
-        {
-            icon: Shield,
-            title: 'Report Issues',
-            desc: 'Students can flag attendance errors. Admins review, approve, or respond directly.',
-            color: 'cyan',
-            gradient: 'from-cyan-500/20 to-cyan-600/5',
-        },
-    ];
 
-    const colorMap = {
-        blue: { text: 'text-blue-400', border: 'border-blue-500/20', glow: 'bg-blue-500/10' },
-        emerald: { text: 'text-emerald-400', border: 'border-emerald-500/20', glow: 'bg-emerald-500/10' },
-        amber: { text: 'text-amber-400', border: 'border-amber-500/20', glow: 'bg-amber-500/10' },
-        purple: { text: 'text-purple-400', border: 'border-purple-500/20', glow: 'bg-purple-500/10' },
-        rose: { text: 'text-rose-400', border: 'border-rose-500/20', glow: 'bg-rose-500/10' },
-        cyan: { text: 'text-cyan-400', border: 'border-cyan-500/20', glow: 'bg-cyan-500/10' },
-    };
+
+    if (!sessionChecked) {
+        return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    }
 
     return (
         <>
@@ -198,75 +161,10 @@ export default function Home() {
                             Track records, plan leaves intelligently, and stay on top of academic requirements — all in one place.
                         </p>
 
-                        {/* Stats pills */}
-                        <div className="animate-fade-up delay-300 flex justify-center gap-4 sm:gap-6 mb-12">
-                            <div ref={classCounter.ref} className="glass-card flex items-center gap-3 px-5 sm:px-6 py-3 !rounded-full" style={{ animation: 'float 6s ease-in-out infinite' }}>
-                                <div className="w-9 h-9 rounded-full bg-blue-500/15 flex items-center justify-center">
-                                    <School className="w-4 h-4 text-blue-400" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-xl sm:text-2xl font-bold tracking-tight">{classCounter.count}</p>
-                                    <p className="text-[10px] sm:text-xs text-[var(--text-dim)] tracking-wide uppercase">Classes</p>
-                                </div>
-                            </div>
-                            <div ref={studentCounter.ref} className="glass-card flex items-center gap-3 px-5 sm:px-6 py-3 !rounded-full" style={{ animation: 'float 6s ease-in-out infinite 1s' }}>
-                                <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                                    <GraduationCap className="w-4 h-4 text-emerald-400" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-xl sm:text-2xl font-bold tracking-tight">{studentCounter.count}</p>
-                                    <p className="text-[10px] sm:text-xs text-[var(--text-dim)] tracking-wide uppercase">Students</p>
-                                </div>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </section>
-
-            {/* ═══════════ RETURNING USERS ═══════════ */}
-            {(savedAdmin || savedStudent) && (
-                <section className="max-w-md mx-auto px-4 mb-10 animate-fade-up delay-400">
-                    <div className="glass-card">
-                        <p className="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-4 text-center font-medium">Continue where you left off</p>
-                        <div className="space-y-3">
-                            {savedStudent && (
-                                <button
-                                    onClick={() => router.push(`/student/${savedStudent.classId}/${savedStudent.rollNumber}`)}
-                                    className="w-full py-3.5 px-5 rounded-xl border border-emerald-500/20 bg-emerald-950/20 hover:bg-emerald-950/40 transition-all flex items-center justify-between group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                                            <GraduationCap className="w-4 h-4 text-emerald-400" />
-                                        </div>
-                                        <div className="text-left">
-                                            <p className="text-sm font-semibold text-emerald-400">Student Dashboard</p>
-                                            <p className="text-xs text-[var(--text-dim)]">{savedStudent.className} · Roll #{savedStudent.rollNumber}</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
-                                </button>
-                            )}
-                            {savedAdmin && (
-                                <button
-                                    onClick={() => router.push('/admin/dashboard')}
-                                    className="w-full py-3.5 px-5 rounded-xl border border-blue-500/20 bg-blue-950/20 hover:bg-blue-950/40 transition-all flex items-center justify-between group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center">
-                                            <Shield className="w-4 h-4 text-blue-400" />
-                                        </div>
-                                        <div className="text-left">
-                                            <p className="text-sm font-semibold text-blue-400">Admin Panel</p>
-                                            <p className="text-xs text-[var(--text-dim)]">{savedAdmin.className}</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-blue-400 group-hover:translate-x-1 transition-transform" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {/* ═══════════ LOGIN SECTION ═══════════ */}
             <section className="max-w-md mx-auto px-4 mb-20">
@@ -377,138 +275,7 @@ export default function Home() {
                 )}
             </section>
 
-            {/* ═══════════ HOW IT WORKS ═══════════ */}
-            <section className="max-w-5xl mx-auto px-4 mb-20">
-                <div className="text-center mb-10">
-                    <p className="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-3">How it works</p>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ letterSpacing: '-0.03em' }}>
-                        Three simple steps
-                    </h2>
-                </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
-                    {[
-                        {
-                            step: '01',
-                            title: 'Admin sets up',
-                            desc: 'Create a class, add subjects, define the weekly timetable, and set your class strength.',
-                            icon: BookOpen,
-                            color: 'blue',
-                        },
-                        {
-                            step: '02',
-                            title: 'Mark attendance',
-                            desc: 'Each day, the admin taps absent students on a smart grid. The timetable auto-loads.',
-                            icon: Users,
-                            color: 'purple',
-                        },
-                        {
-                            step: '03',
-                            title: 'Students track',
-                            desc: 'View live percentages, plan bunks safely, browse calendar history, and report errors.',
-                            icon: TrendingUp,
-                            color: 'emerald',
-                        },
-                    ].map((item, i) => (
-                        <div key={i} className={`glass-card text-center group animate-fade-up delay-${(i + 1) * 100}`}>
-                            {/* Step number */}
-                            <div className="text-xs font-mono text-[var(--text-dim)] mb-4 tracking-widest">{item.step}</div>
-
-                            {/* Icon */}
-                            <div className={`w-12 h-12 rounded-xl ${colorMap[item.color]?.glow} ${colorMap[item.color]?.border} border flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
-                                <item.icon className={`w-5 h-5 ${colorMap[item.color]?.text}`} />
-                            </div>
-
-                            <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                            <p className="text-sm text-[var(--text-dim)] leading-relaxed">{item.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ═══════════ FEATURES ═══════════ */}
-            <section className="max-w-5xl mx-auto px-4 mb-20">
-                <div className="text-center mb-10">
-                    <p className="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-3">Features</p>
-                    <h2 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ letterSpacing: '-0.03em' }}>
-                        Everything you need
-                    </h2>
-                </div>
-
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {features.map((f, i) => {
-                        const colors = colorMap[f.color];
-                        return (
-                            <div
-                                key={i}
-                                className={`glass-card group cursor-default animate-fade-up delay-${Math.min((i + 1) * 100, 600)}`}
-                            >
-                                <div className={`w-10 h-10 rounded-lg ${colors.glow} ${colors.border} border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <f.icon className={`w-5 h-5 ${colors.text}`} />
-                                </div>
-                                <h3 className="font-semibold mb-1.5">{f.title}</h3>
-                                <p className="text-sm text-[var(--text-dim)] leading-relaxed">{f.desc}</p>
-                            </div>
-                        );
-                    })}
-                </div>
-            </section>
-
-            {/* ═══════════ BENEFITS ═══════════ */}
-            <section className="max-w-4xl mx-auto px-4 mb-20">
-                <div className="glass-card bg-gradient-to-br from-white/[0.04] to-transparent !p-8 sm:!p-10">
-                    <div className="text-center mb-8">
-                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ letterSpacing: '-0.03em' }}>
-                            Built for everyone
-                        </h2>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-8">
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                                    <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                                </div>
-                                <h3 className="font-semibold text-emerald-400">For Students</h3>
-                            </div>
-                            <ul className="space-y-3">
-                                {[
-                                    'Know your exact attendance anytime',
-                                    'Plan leaves without risking detention',
-                                    'Subject-wise tracking & alerts',
-                                    'Calendar view of entire history',
-                                ].map((item, i) => (
-                                    <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-dim)]">
-                                        <span className="text-emerald-400 mt-0.5 text-xs">✓</span>
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="w-7 h-7 rounded-full bg-blue-500/15 flex items-center justify-center">
-                                    <Shield className="w-3.5 h-3.5 text-blue-400" />
-                                </div>
-                                <h3 className="font-semibold text-blue-400">For Admins</h3>
-                            </div>
-                            <ul className="space-y-3">
-                                {[
-                                    'Auto-loading timetable — one tap start',
-                                    'Bulk input for fast attendance marking',
-                                    'Flexible timetable & subject management',
-                                    'Report review & response system',
-                                ].map((item, i) => (
-                                    <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-dim)]">
-                                        <span className="text-blue-400 mt-0.5 text-xs">✓</span>
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             {/* ═══════════ FOOTER ═══════════ */}
             <footer className="border-t border-white/5 py-8">

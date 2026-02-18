@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-    LayoutDashboard, Calendar, Settings, FileText,
+    LayoutDashboard, Calendar, FileText,
     AlertTriangle, LogOut, Zap, BookOpen, Flag, Menu, X
 } from 'lucide-react';
 
@@ -90,8 +90,8 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                         {isAdmin ? (
                             <>
                                 <NavLink href="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" />
-                                <NavLink href="/admin/timetable" icon={Calendar} label="Timetable" />
-                                <NavLink href="/admin/settings" icon={Settings} label="Settings" />
+                                <NavLink href="/admin/subjects" icon={BookOpen} label="Subjects" />
+
                                 <NavLink href="/admin/attention" icon={AlertTriangle} label="Attention" />
                                 {navClassId && (
                                     <NavLink href={`/admin/reports/${navClassId}`} icon={FileText} label="Reports" />
