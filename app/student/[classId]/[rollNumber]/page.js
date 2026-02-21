@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
+import useSWR, { mutate } from 'swr';
 
 export default function StudentDashboard() {
   const params = useParams();
@@ -12,11 +13,53 @@ export default function StudentDashboard() {
   const router = useRouter();
   const notify = useNotification();
 
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [minPercentage, setMinPercentage] = useState(75);
-  const [announcementCount, setAnnouncementCount] = useState(0);
-  const [allAnnouncements, setAllAnnouncements] = useState([]);
+
+  const fetcher = url => api.get(url).then(res => res.data);
+
+  const { data, error, isLoading: reportLoading } = useSWR(
+    classId && rollNumber ? `/student/report/${classId}/${rollNumber}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      onSuccess: (resData) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`cls_config_${classId}_${rollNumber}`, JSON.stringify(resData));
+        }
+      },
+      fallbackData: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(`cls_config_${classId}_${rollNumber}`) || "null") : null
+    }
+  );
+
+  const { data: reportsResponse } = useSWR(
+    classId && rollNumber ? `/reports/${classId}/${rollNumber}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const { data: announcementsResponse } = useSWR(
+    classId ? `/announcements/${classId}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const allAnnouncements = announcementsResponse?.announcements || [];
+
+  const now = new Date();
+  const announcementCount = allAnnouncements.filter(a => {
+    if (!a.dueDate) return false;
+    const due = new Date(a.dueDate);
+    const diff = due - now;
+    return diff > 0 && diff < 86400000;
+  }).length;
+
+  const loading = reportLoading && !data;
+
+  useEffect(() => {
+    if (error) {
+      notify({ message: "Student not found or Server Error", type: 'error' });
+    }
+  }, [error]);
 
   // History/Works Modal
   const [historyModal, setHistoryModal] = useState(false);
@@ -32,7 +75,7 @@ export default function StudentDashboard() {
   const [reportSubjectId, setReportSubjectId] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [myReports, setMyReports] = useState([]);
+  const myReports = reportsResponse?.reports || [];
 
   // Load saved min percentage from localStorage
   useEffect(() => {
@@ -74,50 +117,7 @@ export default function StudentDashboard() {
     return { text: `${diffDays} days left`, type: 'safe', days: diffDays };
   };
 
-  const fetchData = async () => {
-    if (!classId || !rollNumber) return;
-
-    try {
-      const [reportRes, reportsRes, announcementsRes] = await Promise.allSettled([
-        api.get(`/student/report/${classId}/${rollNumber}`),
-        api.get(`/reports/${classId}/${rollNumber}`),
-        api.get(`/announcements/${classId}`)
-      ]);
-
-      if (reportRes.status === 'fulfilled') {
-        setData(reportRes.value.data);
-      } else {
-        notify({ message: "Student not found or Server Error", type: 'error' });
-      }
-
-      if (reportsRes.status === 'fulfilled') {
-        setMyReports(reportsRes.value.data.reports || []);
-      }
-
-      if (announcementsRes.status === 'fulfilled') {
-        const announcements = announcementsRes.value.data.announcements || [];
-        setAllAnnouncements(announcements);
-
-        // Count urgent announcements (due in next 24h)
-        const now = new Date();
-        const urgentCount = announcements.filter(a => {
-          if (!a.dueDate) return false;
-          const due = new Date(a.dueDate);
-          const diff = due - now;
-          return diff > 0 && diff < 86400000;
-        }).length;
-        setAnnouncementCount(urgentCount);
-      }
-    } catch (err) {
-      console.error("Fetch Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [classId, rollNumber]);
+  // Fetching is now handled by SWR and localStorage caching above
 
   const handleLogout = () => {
     localStorage.removeItem('studentClassId');
@@ -172,8 +172,7 @@ export default function StudentDashboard() {
       setReportSubjectId('');
       setReportDescription('');
 
-      const res = await api.get(`/reports/${classId}/${rollNumber}`);
-      setMyReports(res.data.reports || []);
+      mutate(`/reports/${classId}/${rollNumber}`);
     } catch (err) {
       notify({ message: "Failed to submit report", type: 'error' });
     } finally {
