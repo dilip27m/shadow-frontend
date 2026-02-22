@@ -373,3 +373,26 @@ input[type="range"]::-moz-range-thumb {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* ─── Premium Cropper Mobile Overrides ─── */
+.cropper-point {
+  width: 30px !important;
+  height: 30px !important;
+  background-color: #10b981 !important;
+  opacity: 0.9 !important;
+  border-radius: 50%;
+}
+.cropper-point.point-se { right: -15px !important; bottom: -15px !important; }
+.cropper-point.point-nw { left: -15px !important; top: -15px !important; }
+.cropper-point.point-ne { right: -15px !important; top: -15px !important; }
+.cropper-point.point-sw { left: -15px !important; bottom: -15px !important; }
+.cropper-point.point-n, .cropper-point.point-s, .cropper-point.point-e, .cropper-point.point-w {
+  display: none !important; /* Hide edge points, use corners for resize to reduce clutter */
+}
+.cropper-view-box {
+  outline: 2px solid #10b981 !important;
+  outline-color: rgba(16, 185, 129, 0.8) !important;
+}
+.cropper-line {
+  background-color: transparent !important;
+}
