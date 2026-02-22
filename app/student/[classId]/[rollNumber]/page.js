@@ -174,6 +174,7 @@ export default function StudentDashboard() {
     localStorage.removeItem('studentClassId');
     localStorage.removeItem('studentRoll');
     localStorage.removeItem('studentClassName');
+    localStorage.removeItem('studentToken');
     router.push('/');
   };
 
@@ -246,7 +247,7 @@ export default function StudentDashboard() {
   const handleDeleteReport = async (reportId) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
     try {
-      await api.delete(`/reports/delete/${reportId}?studentRoll=${rollNumber}`);
+      await api.delete(`/reports/delete/${reportId}`);
       notify({ message: "Report deleted successfully", type: 'success' });
       mutate(reportsKey);
     } catch (err) {

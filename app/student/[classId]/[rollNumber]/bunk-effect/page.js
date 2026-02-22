@@ -75,6 +75,7 @@ export default function BunkEffect() {
         localStorage.removeItem('studentClassId');
         localStorage.removeItem('studentRoll');
         localStorage.removeItem('studentClassName');
+        localStorage.removeItem('studentToken');
         router.push('/');
     };
 
