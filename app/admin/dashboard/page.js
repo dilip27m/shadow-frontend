@@ -1,15 +1,12 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-    Save, Plus, X, Calendar as CalendarIcon,
-    RotateCcw, FileText, Clock, CheckCircle,
-    AlertTriangle, Loader2, Camera, Lock, LockOpen
-} from 'lucide-react';
+import { Save, Plus, Trash2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Key, CheckCircle, AlertCircle } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import Calendar from '@/app/components/Calendar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
+import CustomSelect from '@/app/components/CustomSelect';
 
 const sanitizeRollNumber = (value) => {
     if (value === undefined || value === null) return null;
@@ -52,101 +49,33 @@ export default function AdminDashboard() {
     const router = useRouter();
     const notify = useNotification();
     const [loading, setLoading] = useState(true);
-    const [periods, setPeriods] = useState([]);
     const [classId, setClassId] = useState(null);
     const [className, setClassName] = useState('');
+    const [classStrength, setClassStrength] = useState(70);
+    const [subjects, setSubjects] = useState([]); // Saved subjects with teacher info
     const [selectedDate, setSelectedDate] = useState('');
-    const [subjects, setSubjects] = useState([]);
-    const [absentees, setAbsentees] = useState({});
-    const [absentInputs, setAbsentInputs] = useState({});
     const [showCalendar, setShowCalendar] = useState(false);
     const [attendanceDates, setAttendanceDates] = useState([]);
-    const [hasModifications, setHasModifications] = useState(false);
-    const [isViewingPastDate, setIsViewingPastDate] = useState(false);
     const [lastModified, setLastModified] = useState(null);
-    const [classRollNumbers, setClassRollNumbers] = useState([]);
-    const [saving, setSaving] = useState(false);
-    const [pendingReports, setPendingReports] = useState(0);
-    const [confirmRemovePeriod, setConfirmRemovePeriod] = useState(null);
-    const [isScanning, setIsScanning] = useState(false);
-    const [scanningPeriodIndex, setScanningPeriodIndex] = useState(null);
-    const [showAddStudentModal, setShowAddStudentModal] = useState(false);
-    const [newStudentRoll, setNewStudentRoll] = useState('');
-    const [addingStudent, setAddingStudent] = useState(false);
-    const [isDateLocked, setIsDateLocked] = useState(false);
-    const [autoRelockArmed, setAutoRelockArmed] = useState(false);
-    const fileInputRef = useRef(null);
-    const autoRelockTimerRef = useRef(null);
-    const allowedRollSet = new Set(classRollNumbers);
 
-    // Check if viewing past date
-    const checkIfPastDate = (date) => {
-        const today = new Date().toISOString().split('T')[0];
-        setIsViewingPastDate(date < today);
-    };
+    // Periods for the selected date
+    const [periods, setPeriods] = useState([]);
+    const [expandedPeriod, setExpandedPeriod] = useState(null);
+    const [hasChanges, setHasChanges] = useState(false);
 
-    // Get day name from date string
-    const getDayName = (dateStr) => {
-        const date = new Date(dateStr + 'T00:00:00');
-        return date.toLocaleDateString('en-US', { weekday: 'long' });
-    };
+    // Teacher verification codes per period
+    const [verificationCodes, setVerificationCodes] = useState({});
 
-    // Load attendance for selected date
-    const loadAttendanceForDate = useCallback(async (date, cId) => {
-        try {
-            const res = await api.get(`/attendance/by-date/${cId}/${date}`);
-            if (res.data && res.data.periods && res.data.periods.length > 0) {
-                // Load saved attendance
-                const formattedPeriods = res.data.periods.map(period => ({
-                    period: period.periodNum,
-                    subjectName: period.subjectName,
-                    subjectId: period.subjectId
-                }));
+    // New period form
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [newSubjectName, setNewSubjectName] = useState('');
+    const [selectedSubjectId, setSelectedSubjectId] = useState('');
+    const [isCustomSubject, setIsCustomSubject] = useState(false);
 
-                const newAbsentees = {};
-                const newAbsentInputs = {};
-                res.data.periods.forEach((period, index) => {
-                    const normalizedRolls = sortRollNumbers(
-                        (period.absentRollNumbers || [])
-                            .map((roll) => sanitizeRollNumber(roll))
-                            .filter(Boolean)
-                    );
-                    newAbsentees[index] = normalizedRolls;
-                    newAbsentInputs[index] = normalizedRolls.join(', ');
-                });
+    // Ref to track if initial load is done
+    const isInitialLoad = useRef(true);
 
-                setPeriods(formattedPeriods);
-                setAbsentees(newAbsentees);
-                setAbsentInputs(newAbsentInputs);
-                setHasModifications(false);
-                setIsDateLocked(true);
-                setAutoRelockArmed(false);
-
-                if (res.data.updatedAt) {
-                    setLastModified(new Date(res.data.updatedAt));
-                }
-            } else {
-                // No attendance for this date — DO NOT auto-load (User request)
-                setPeriods([]);
-                setAbsentees({});
-                setAbsentInputs({});
-                setHasModifications(false);
-                setLastModified(null);
-                setIsDateLocked(false);
-                setAutoRelockArmed(false);
-            }
-        } catch (err) {
-            // Error fetching attendance — reset to empty
-            setPeriods([]);
-            setAbsentees({});
-            setAbsentInputs({});
-            setHasModifications(false);
-            setLastModified(null);
-            setIsDateLocked(false);
-            setAutoRelockArmed(false);
-        }
-    }, []);
-
+    // Load class info on mount
     useEffect(() => {
         const storedClassId = localStorage.getItem('adminClassId');
         if (!storedClassId) {
@@ -157,85 +86,79 @@ export default function AdminDashboard() {
 
         const today = new Date().toISOString().split('T')[0];
         setSelectedDate(today);
-        checkIfPastDate(today);
 
-        // Parallel data fetching for speed
-        Promise.all([
-            api.get(`/class/${storedClassId}`),
-            api.get(`/attendance/dates/${storedClassId}`).catch(() => ({ data: { dates: [] } })),
-            api.get(`/reports/class/${storedClassId}`).catch(() => ({ data: { reports: [] } })),
-        ]).then(([classRes, datesRes, reportsRes]) => {
-            const subjectsList = classRes.data.subjects;
-            const normalizedClassRollNumbers = normalizeClassRollNumbers(classRes.data);
+        api.get(`/class/${storedClassId}`)
+            .then(res => {
+                setClassName(res.data.className);
+                setClassStrength(res.data.totalStudents || 70);
+                setSubjects(res.data.subjects || []);
+                setLoading(false);
 
-            setSubjects(subjectsList);
-            setClassName(classRes.data.className);
-            setClassRollNumbers(normalizedClassRollNumbers);
+                // Load attendance for today (only on initial load)
+                loadAttendanceForDate(today, storedClassId);
 
-            // Format attendance dates
-            const formattedDates = (datesRes.data.dates || []).map(dateStr => {
-                return new Date(dateStr).toISOString().split('T')[0];
+                api.get(`/attendance/dates/${storedClassId}`)
+                    .then(datesRes => {
+                        const formattedDates = (datesRes.data.dates || []).map(dateStr => {
+                            return new Date(dateStr).toISOString().split('T')[0];
+                        });
+                        setAttendanceDates(formattedDates);
+                    })
+                    .catch(() => { });
+
+                // Mark initial load as complete after a short delay
+                setTimeout(() => {
+                    isInitialLoad.current = false;
+                }, 500);
+            })
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
             });
-            setAttendanceDates(formattedDates);
+    }, [router]);
 
-            // Count pending reports
-            const pending = (reportsRes.data.reports || []).filter(r => r.status === 'pending').length;
-            setPendingReports(pending);
-
-            setLoading(false);
-
-            // Load attendance for today
-            loadAttendanceForDate(today, storedClassId);
-        }).catch(() => {
-            setLoading(false);
-        });
-    }, [router, loadAttendanceForDate]);
-
-    // Load attendance when date changes
+    // Load attendance when date changes (skip initial load)
     useEffect(() => {
-        if (classId && selectedDate && subjects.length > 0) {
+        if (classId && selectedDate && !isInitialLoad.current) {
             loadAttendanceForDate(selectedDate, classId);
-            checkIfPastDate(selectedDate);
             setShowCalendar(false);
         }
-    }, [selectedDate, classId, subjects, loadAttendanceForDate]);
+    }, [selectedDate]);
 
-    const clearAutoRelockTimer = useCallback(() => {
-        if (autoRelockTimerRef.current) {
-            clearTimeout(autoRelockTimerRef.current);
-            autoRelockTimerRef.current = null;
+    const loadAttendanceForDate = async (date, classId) => {
+        try {
+            const res = await api.get(`/attendance/by-date/${classId}/${date}`);
+            if (res.data && res.data.periods && res.data.periods.length > 0) {
+                setPeriods(res.data.periods.map(p => ({
+                    periodNum: p.periodNum,
+                    subjectName: p.subjectName || '',
+                    subjectId: p.subjectId || '',
+                    absentRollNumbers: p.absentRollNumbers || [],
+                    isVerified: p.isVerified || false
+                })));
+
+                // Pre-fill verification codes for verified periods (keyed by periodNum)
+                const codes = {};
+                res.data.periods.forEach((p) => {
+                    codes[p.periodNum] = p.isVerified ? '****' : '';
+                });
+                setVerificationCodes(codes);
+
+                setLastModified(res.data.updatedAt ? new Date(res.data.updatedAt) : null);
+            } else {
+                setPeriods([]);
+                setVerificationCodes({});
+                setLastModified(null);
+            }
+            setHasChanges(false);
+            setExpandedPeriod(null);
+        } catch (err) {
+            setPeriods([]);
+            setVerificationCodes({});
+            setLastModified(null);
+            setHasChanges(false);
         }
-    }, []);
-
-    useEffect(() => {
-        if (isDateLocked || !autoRelockArmed) {
-            clearAutoRelockTimer();
-            return;
-        }
-
-        const resetAutoRelockTimer = () => {
-            clearAutoRelockTimer();
-            autoRelockTimerRef.current = window.setTimeout(() => {
-                setIsDateLocked(true);
-                setAutoRelockArmed(false);
-                notify({ message: 'Editing auto-locked after 2 minutes of inactivity.', type: 'success' });
-            }, AUTO_RELOCK_MS);
-        };
-
-        const activityEvents = ['pointerdown', 'keydown', 'input', 'touchstart'];
-        activityEvents.forEach((eventName) => {
-            window.addEventListener(eventName, resetAutoRelockTimer, true);
-        });
-
-        resetAutoRelockTimer();
-
-        return () => {
-            activityEvents.forEach((eventName) => {
-                window.removeEventListener(eventName, resetAutoRelockTimer, true);
-            });
-            clearAutoRelockTimer();
-        };
-    }, [isDateLocked, autoRelockArmed, notify, clearAutoRelockTimer]);
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('adminClassId');
@@ -243,222 +166,124 @@ export default function AdminDashboard() {
         router.push('/');
     };
 
-    const handleCameraButtonClick = (periodIdx) => {
-        if (isDateLocked) return;
-        setScanningPeriodIndex(periodIdx);
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
-    };
-
-    const handleImageUpload = async (e) => {
-        if (isDateLocked) return;
-        const file = e.target.files?.[0];
-        if (!file || scanningPeriodIndex === null) return;
-
-        e.target.value = ''; // Reset input
-        setIsScanning(true);
-        try {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = async () => {
-                const base64data = reader.result;
-                try {
-                    const res = await api.post('/ai/scan-logbook', { imageBase64: base64data });
-                    const rollNumbersStr = res.data.rollNumbers || '';
-                    if (!rollNumbersStr) {
-                        notify({ message: "No numbers found in the image", type: 'error' });
-                    } else {
-                        handleBulkAbsentInput(scanningPeriodIndex, rollNumbersStr);
-                        notify({ message: "Logbook scanned successfully!", type: 'success' });
-                    }
-                } catch (apiErr) {
-                    const errorMsg = apiErr.response?.data?.details || apiErr.response?.data?.error || apiErr.message || "Please check server.";
-                    notify({ message: `AI Scan failed: ${errorMsg}`, type: 'error' });
-                } finally {
-                    setIsScanning(false);
-                    setScanningPeriodIndex(null);
-                }
+    // Get teacher info for a subject (show PIN for any assigned teacher)
+    const getTeacherForSubject = (subjectId) => {
+        if (!subjectId) return null;
+        const subject = subjects.find(s => s._id === subjectId);
+        // Show PIN entry for any teacher that's assigned (not just Verified)
+        if (subject && subject.teacherId) {
+            console.log('📚 Subject:', subject.name, 'Teacher:', subject.teacherName, 'Status:', subject.teacherStatus);
+            return {
+                name: subject.teacherName || 'Assigned Teacher',
+                id: subject.teacherId
             };
-        } catch (err) {
-            notify({ message: "Failed to read image", type: 'error' });
-            setIsScanning(false);
-            setScanningPeriodIndex(null);
         }
+        return null;
     };
 
+    // Add a new period
     const addPeriod = () => {
-        if (isDateLocked) return;
-        const nextPeriodNum = periods.length > 0
-            ? Math.max(...periods.map(p => p.period)) + 1
+        const nextNum = periods.length > 0
+            ? Math.max(...periods.map(p => p.periodNum)) + 1
             : 1;
-        setPeriods([...periods, { period: nextPeriodNum, subjectId: "", subjectName: "" }]);
-        setHasModifications(true);
-    };
 
-    const requestRemovePeriod = (periodNum) => {
-        if (isDateLocked) return;
-        setConfirmRemovePeriod(periodNum);
-    };
+        let periodSubjectId = '';
+        let periodSubjectName = '';
 
-    const confirmAndRemovePeriod = () => {
-        if (confirmRemovePeriod === null) return;
-        const periodNum = confirmRemovePeriod;
-        const indexToRemove = periods.findIndex(p => p.period === periodNum);
-        if (indexToRemove === -1) return;
+        if (!isCustomSubject && selectedSubjectId) {
+            const existingSubject = subjects.find(s => s._id === selectedSubjectId);
+            if (existingSubject) {
+                periodSubjectId = existingSubject._id;
+                periodSubjectName = existingSubject.name;
+                console.log('✅ Selected existing subject:', periodSubjectName);
+            }
+        }
 
-        setPeriods(prev => prev.filter(p => p.period !== periodNum));
+        // Fallback or Custom
+        if (!periodSubjectId) {
+            // Try matching by name if custom or fallback
+            const inputName = newSubjectName.trim();
+            if (!inputName && !periodSubjectName) {
+                notify({ message: 'Please enter a subject name', type: 'error' });
+                return;
+            }
 
-        const shiftState = (prev) => {
-            const updated = {};
-            Object.keys(prev).forEach(key => {
-                const k = parseInt(key, 10);
-                if (isNaN(k)) return;
-                if (k < indexToRemove) updated[k] = prev[k];
-                else if (k > indexToRemove) updated[k - 1] = prev[k];
-            });
-            return updated;
+            // Even if custom, check if it matches an existing subject by name
+            const existingSubject = subjects.find(s =>
+                s.name.toLowerCase() === inputName.toLowerCase()
+            );
+
+            if (existingSubject) {
+                periodSubjectId = existingSubject._id;
+                periodSubjectName = existingSubject.name;
+                console.log('✅ Custom name matched existing subject:', periodSubjectName);
+            } else {
+                periodSubjectName = inputName;
+                console.log('⚠️ Using custom subject name (no teacher verification):', periodSubjectName);
+            }
+        }
+
+        console.log('🔍 Final Period Data -> Name:', periodSubjectName, 'ID:', periodSubjectId);
+
+        const newPeriod = {
+            periodNum: nextNum,
+            subjectName: periodSubjectName,
+            subjectId: periodSubjectId,
+            absentRollNumbers: [],
+            isVerified: false
         };
 
-        setAbsentees(shiftState);
-        setAbsentInputs(shiftState);
-        setHasModifications(true);
-        setConfirmRemovePeriod(null);
-        notify({ message: `Period P${periodNum} removed`, type: 'success' });
+        const newPeriods = [...periods, newPeriod];
+        setPeriods(newPeriods);
+        setVerificationCodes(prev => ({ ...prev, [nextNum]: '' }));
+        setNewSubjectName('');
+        setSelectedSubjectId('');
+        setIsCustomSubject(false);
+        setShowAddForm(false);
+        setExpandedPeriod(nextNum);
+        setHasChanges(true);
     };
 
-    const cancelRemovePeriod = () => {
-        setConfirmRemovePeriod(null);
-    };
+    // Delete a period
+    const deletePeriod = (periodNum) => {
+        setPeriods(periods.filter(p => p.periodNum !== periodNum));
 
-    const updatePeriod = (periodNum, subjectId) => {
-        if (isDateLocked) return;
-        const subject = subjects.find(s => s._id === subjectId);
-        setPeriods(prev => prev.map(slot =>
-            slot.period === periodNum
-                ? { ...slot, subjectId, subjectName: subject ? subject.name : "" }
-                : slot
-        ));
-        setHasModifications(true);
-    };
-
-    const toggleAbsent = (periodIdx, rollNo) => {
-        if (isDateLocked) return;
-        setAbsentees(prev => {
-            const currentList = prev[periodIdx] || [];
-            let newList;
-            if (currentList.includes(rollNo)) {
-                newList = currentList.filter(r => r !== rollNo);
-            } else {
-                newList = [...currentList, rollNo];
-            }
-
-            setAbsentInputs(prevInputs => ({
-                ...prevInputs,
-                [periodIdx]: sortRollNumbers(newList).join(', ')
-            }));
-
-            return { ...prev, [periodIdx]: sortRollNumbers(newList) };
+        // Remove verification code for deleted period (keyed by periodNum)
+        setVerificationCodes(prev => {
+            const newCodes = { ...prev };
+            delete newCodes[periodNum];
+            return newCodes;
         });
-        setHasModifications(true);
+
+        setHasChanges(true);
+        if (expandedPeriod === periodNum) setExpandedPeriod(null);
     };
 
-    const handleBulkAbsentInput = (periodIdx, inputValue) => {
-        if (isDateLocked) return;
-        setAbsentInputs(prev => ({ ...prev, [periodIdx]: inputValue }));
-
-        if (!inputValue.trim()) {
-            setAbsentees(prev => ({ ...prev, [periodIdx]: [] }));
-            setHasModifications(true);
-            return;
-        }
-
-        const uniqueRolls = [];
-        const seen = new Set();
-        inputValue
-            .split(/[,\n]/)
-            .map(str => sanitizeRollNumber(str))
-            .filter(Boolean)
-            .forEach((roll) => {
-                if (allowedRollSet.has(roll) && !seen.has(roll)) {
-                    seen.add(roll);
-                    uniqueRolls.push(roll);
-                }
-            });
-
-        setAbsentees(prev => ({ ...prev, [periodIdx]: sortRollNumbers(uniqueRolls) }));
-        setHasModifications(true);
-    };
-
-    // Mark all present for a period (clear absentees)
-    const markAllPresent = (periodIdx) => {
-        if (isDateLocked) return;
-        setAbsentees(prev => ({ ...prev, [periodIdx]: [] }));
-        setAbsentInputs(prev => ({ ...prev, [periodIdx]: '' }));
-        setHasModifications(true);
-    };
-
-    // Copy absentees from previous period
-    const copyFromPrevious = (periodIdx) => {
-        if (isDateLocked) return;
-        if (periodIdx === 0) return;
-        const prevAbsentees = absentees[periodIdx - 1] || [];
-        setAbsentees(prev => ({ ...prev, [periodIdx]: sortRollNumbers(prevAbsentees) }));
-        setAbsentInputs(prev => ({
-            ...prev,
-            [periodIdx]: sortRollNumbers(prevAbsentees).join(', ')
+    // Toggle absent status
+    const toggleAbsent = (periodNum, rollNo) => {
+        setPeriods(periods.map(p => {
+            if (p.periodNum !== periodNum) return p;
+            const isAbsent = p.absentRollNumbers.includes(rollNo);
+            return {
+                ...p,
+                absentRollNumbers: isAbsent
+                    ? p.absentRollNumbers.filter(r => r !== rollNo)
+                    : [...p.absentRollNumbers, rollNo].sort((a, b) => a - b)
+            };
         }));
-        setHasModifications(true);
-        notify({ message: `Copied ${prevAbsentees.length} absentee(s) from P${periods[periodIdx - 1]?.period || periodIdx}`, type: 'success' });
+        setHasChanges(true);
     };
 
-    const unlockDateForEdit = () => {
-        const readableDate = selectedDate
-            ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            })
-            : 'this date';
-
-        const confirmed = window.confirm(`Unlock attendance for ${readableDate}?`);
-        if (!confirmed) return;
-
-        setIsDateLocked(false);
-        setAutoRelockArmed(true);
-        notify({ message: 'Editing unlocked. Save after making changes.', type: 'success' });
+    // Handle verification code input (keyed by periodNum)
+    const handleCodeInput = (periodNum, value) => {
+        // Only allow 4 digits
+        const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+        setVerificationCodes(prev => ({ ...prev, [periodNum]: cleanValue }));
+        setHasChanges(true);
     };
 
-    const addStudentToClass = async () => {
-        if (!classId || addingStudent) return;
-        const rollNumber = sanitizeRollNumber(newStudentRoll);
-
-        if (!rollNumber) {
-            notify({ message: 'Enter a valid roll number.', type: 'error' });
-            return;
-        }
-
-        setAddingStudent(true);
-        try {
-            const res = await api.patch(`/classes/${classId}/students`, { rollNumber });
-            const updatedRolls = normalizeClassRollNumbers({ rollNumbers: res.data.rollNumbers });
-            setClassRollNumbers(updatedRolls);
-            setNewStudentRoll('');
-            setShowAddStudentModal(false);
-            notify({ message: `Student ${rollNumber} added successfully.`, type: 'success' });
-        } catch (err) {
-            if (err.response?.status === 409) {
-                notify({ message: err.response?.data?.error || 'Roll number already exists in this class.', type: 'error' });
-            } else {
-                notify({ message: err.response?.data?.error || 'Failed to add student.', type: 'error' });
-            }
-        } finally {
-            setAddingStudent(false);
-        }
-    };
-
-    const submitAttendance = async () => {
+    // Save attendance
+    const saveAttendance = async () => {
         if (!classId) return;
         if (isDateLocked) return;
         if (classRollNumbers.length === 0) {
@@ -472,26 +297,60 @@ export default function AdminDashboard() {
             return;
         }
 
-        setSaving(true);
-        const formattedPeriods = periods.map((slot, index) => ({
-            periodNum: slot.period,
-            subjectId: slot.subjectId,
-            subjectName: slot.subjectName,
-            absentRollNumbers: sortRollNumbers(absentees[index] || [])
+        // Check if any periods with assigned teachers need verification
+        const periodsNeedingVerification = periods.filter((p) => {
+            const teacher = getTeacherForSubject(p.subjectId);
+            // If already verified, we don't need a PIN (unless we want to re-verify, but usually we presume it persists)
+            if (p.isVerified) return false;
+
+            const code = verificationCodes[p.periodNum];  // Use periodNum as key
+            return teacher && (!code || code.length !== 4);
+        });
+
+        if (periodsNeedingVerification.length > 0) {
+            const subjectNames = periodsNeedingVerification.map(p => p.subjectName).join(', ');
+            notify({
+                message: `Please enter teacher PIN for: ${subjectNames}`,
+                type: 'error'
+            });
+            return;
+        }
+
+        const formattedPeriods = periods.map((p) => ({
+            periodNum: p.periodNum,
+            subjectId: p.subjectId,
+            subjectName: p.subjectName,
+            absentRollNumbers: p.absentRollNumbers,
+            verificationCode: verificationCodes[p.periodNum] !== '****' ? verificationCodes[p.periodNum] : ''  // Use periodNum
         }));
 
         try {
-            await api.post('/attendance/mark', {
-                classId: classId,
+            const res = await api.post('/attendance/mark', {
+                classId,
                 date: selectedDate,
                 periods: formattedPeriods
             });
-            notify({ message: "Attendance Saved Successfully ✓", type: 'success' });
-            setHasModifications(false);
-            setIsDateLocked(true);
-            setAutoRelockArmed(false);
 
-            // Refresh attendance dates list
+            // Check if all periods with teachers were verified
+            const savedPeriods = res.data.data.periods || [];
+            const failedVerifications = savedPeriods.filter((p, idx) => {
+                const teacher = getTeacherForSubject(p.subjectId);
+                return teacher && !p.isVerified;
+            });
+
+            if (failedVerifications.length > 0) {
+                const failedNames = failedVerifications.map(p => p.subjectName).join(', ');
+                notify({
+                    message: `Saved, but wrong PIN for: ${failedNames}`,
+                    type: 'error'
+                });
+            } else {
+                notify({ message: 'Attendance saved & verified!', type: 'success' });
+            }
+
+            setHasChanges(false);
+
+            // Refresh
             api.get(`/attendance/dates/${classId}`)
                 .then(datesRes => {
                     const formattedDates = (datesRes.data.dates || []).map(dateStr => {
@@ -502,10 +361,9 @@ export default function AdminDashboard() {
                 .catch(() => { });
 
             loadAttendanceForDate(selectedDate, classId);
+
         } catch (err) {
-            notify({ message: "Failed to save attendance", type: 'error' });
-        } finally {
-            setSaving(false);
+            notify({ message: 'Failed to save attendance', type: 'error' });
         }
     };
 
@@ -513,25 +371,21 @@ export default function AdminDashboard() {
     const formatDateDisplay = (dateStr) => {
         const date = new Date(dateStr + 'T00:00:00');
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
-        const isToday = date.toDateString() === today.toDateString();
-        const isYesterday = date.toDateString() === yesterday.toDateString();
-
-        if (isToday) return "Today";
-        if (isYesterday) return "Yesterday";
+        if (date.getTime() === today.getTime()) return "Today";
+        if (date.getTime() === yesterday.getTime()) return "Yesterday";
 
         return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
+            weekday: 'short', month: 'short', day: 'numeric'
         });
     };
 
-
-
-    if (loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    if (loading) {
+        return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    }
 
     return (
         <>
@@ -545,97 +399,40 @@ export default function AdminDashboard() {
                 className="hidden"
             />
 
-            <div className="max-w-4xl mx-auto px-4 py-6 pb-24">
+            <div className="max-w-4xl mx-auto px-4 py-6 pb-28">
 
                 {/* ─── Header with Quick Stats ─── */}
                 <div className="mb-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-1" style={{ letterSpacing: '-0.03em' }}>
-                                Mark Attendance
-                            </h1>
-                            <p className="text-[var(--text-dim)] text-sm">{className}</p>
-                            <p className="text-[var(--text-dim)] text-xs mt-1">{classRollNumbers.length} students</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <button
-                                onClick={() => setShowAddStudentModal(true)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/15 transition"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                Add Student
-                            </button>
-                            {pendingReports > 0 && (
-                                <button
-                                    onClick={() => router.push(`/admin/reports/${classId}`)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/15 transition"
-                                >
-                                    <FileText className="w-3.5 h-3.5" />
-                                    {pendingReports} pending report{pendingReports > 1 ? 's' : ''}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-
-
+                    <h1 className="text-2xl font-bold mb-1">Mark Attendance</h1>
+                    <p className="text-[var(--text-dim)] text-sm">{className}</p>
                     {lastModified && (
-                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
-                            <Clock className="w-3 h-3" />
-                            Last modified: {lastModified.toLocaleString('en-US', {
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        <p className="text-xs text-[var(--text-dim)] mt-1">
+                            Last saved: {lastModified.toLocaleString('en-US', {
+                                month: 'short', day: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
                             })}
                         </div>
                     )}
                 </div>
 
-                {isDateLocked && periods.length > 0 && (
-                    <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex items-start gap-2 text-amber-300 text-sm">
-                            <Lock className="w-4 h-4 mt-0.5" />
-                            <span>Saved attendance is locked to prevent accidental edits.</span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={unlockDateForEdit}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-400/40 text-amber-200 hover:bg-amber-400/10 text-xs font-medium transition"
-                        >
-                            <LockOpen className="w-3.5 h-3.5" />
-                            Unlock to Edit
-                        </button>
-                    </div>
-                )}
-
-                {!isDateLocked && autoRelockArmed && periods.length > 0 && (
-                    <div className="mb-5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
-                        <div className="flex items-start gap-2 text-blue-200 text-sm">
-                            <LockOpen className="w-4 h-4 mt-0.5" />
-                            <span>Editing is unlocked. It will auto-lock after 2 minutes of inactivity.</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* ─── Date Selector ─── */}
-                <div className="mb-6">
-                    <button
-                        onClick={() => setShowCalendar(!showCalendar)}
-                        className={`w-full py-3 rounded-full border transition text-sm font-medium flex items-center justify-center gap-2 relative ${showCalendar
-                            ? 'bg-blue-950/30 border-blue-500/40 text-blue-400'
-                            : 'glass-card !rounded-full !py-3 !mb-0 hover:border-white/20'
-                            }`}
-                    >
+                {/* Date Picker */}
+                <button
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    className={`w-full py-3 px-4 rounded-xl border transition text-sm font-medium flex items-center justify-between mb-4 ${showCalendar
+                        ? 'bg-blue-900/20 border-blue-500/50 text-blue-400'
+                        : 'bg-[var(--card-bg)] border-[var(--border)] hover:border-white/50'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
                         <CalendarIcon className="w-4 h-4" />
                         <span>{formatDateDisplay(selectedDate)}</span>
-                        <span className="text-[var(--text-dim)] text-xs ml-1">
-                            · {getDayName(selectedDate)}
-                        </span>
                         {attendanceDates.includes(selectedDate) && (
-                            <div className="absolute top-2 right-4 w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/30"></div>
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                         )}
-                    </button>
-                </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showCalendar ? 'rotate-180' : ''}`} />
+                </button>
 
-                {/* Calendar View */}
                 {showCalendar && (
                     <div className="mb-6 animate-fade-in">
                         <Calendar
@@ -646,223 +443,248 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {/* ─── Period Cards ─── */}
-                {periods.length > 0 && (
+                {/* Periods List */}
+                {periods.length === 0 && !showAddForm ? (
+                    <div className="card text-center py-12">
+                        <p className="text-[var(--text-dim)] mb-4">No periods recorded for this date</p>
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="btn btn-primary inline-flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add First Period
+                        </button>
+                    </div>
+                ) : (
                     <div className="space-y-4">
-                        {periods.map((slot, index) => {
-                            const absentCount = (absentees[index] || []).length;
+                        {periods.map((period) => {
+                            const teacher = getTeacherForSubject(period.subjectId);
+                            const needsVerification = teacher && !period.isVerified;
 
                             return (
-                                <div key={index} className="card animate-fade-in" style={{ position: 'relative', overflow: 'hidden' }}>
-                                    {/* Period header */}
-                                    <div className="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border)]">
+                                <div key={period.periodNum} className="card">
+                                    {/* Period Header */}
+                                    <div
+                                        className="flex justify-between items-center cursor-pointer"
+                                        onClick={() => setExpandedPeriod(
+                                            expandedPeriod === period.periodNum ? null : period.periodNum
+                                        )}
+                                    >
                                         <div className="flex items-center gap-3">
-                                            <span className="text-sm font-bold text-[var(--text-dim)] bg-white/5 w-9 h-9 rounded-lg flex items-center justify-center">
-                                                P{slot.period}
+                                            <span className="text-lg font-bold text-[var(--text-dim)]">
+                                                P{period.periodNum}
                                             </span>
-                                            <select
-                                                className="input w-auto min-w-[150px] !py-2"
-                                                value={slot.subjectId}
-                                                onChange={(e) => updatePeriod(slot.period, e.target.value)}
-                                                disabled={isDateLocked}
-                                            >
-                                                <option value="">-- Select Subject --</option>
-                                                {subjects.map(sub => (
-                                                    <option key={sub._id} value={sub._id}>{sub.name}</option>
-                                                ))}
-                                            </select>
+                                            <div>
+                                                <h2 className="text-lg font-semibold">{period.subjectName}</h2>
+                                                {teacher && (
+                                                    <p className="text-xs text-[var(--text-dim)]">
+                                                        Teacher: {teacher.name}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-
                                         <div className="flex items-center gap-2">
-                                            <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${absentCount > 0
-                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            {/* Verification Status */}
+                                            {teacher && (
+                                                period.isVerified ? (
+                                                    <span className="flex items-center gap-1 text-xs text-green-400">
+                                                        <CheckCircle className="w-3 h-3" />
+                                                        Verified
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 text-xs text-orange-400">
+                                                        <Key className="w-3 h-3" />
+                                                        Needs PIN
+                                                    </span>
+                                                )
+                                            )}
+                                            <span className={`px-3 py-1 rounded-lg text-sm font-medium ${period.absentRollNumbers.length > 0
+                                                ? 'bg-red-500/20 text-red-400'
+                                                : 'bg-green-500/20 text-green-400'
                                                 }`}>
-                                                {absentCount > 0 ? `${absentCount} absent` : 'All present'}
+                                                {period.absentRollNumbers.length} absent
                                             </span>
                                             <button
-                                                onClick={() => requestRemovePeriod(slot.period)}
-                                                className="w-8 h-8 bg-red-500/10 text-red-400 rounded-lg text-xs hover:bg-red-500/20 flex items-center justify-center transition"
-                                                title="Remove period"
-                                                disabled={isDateLocked}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deletePeriod(period.periodNum);
+                                                }}
+                                                className="p-2 hover:bg-red-500/20 rounded-lg transition"
                                             >
-                                                <X className="w-3.5 h-3.5" />
+                                                <Trash2 className="w-4 h-4 text-red-400" />
                                             </button>
+                                            {expandedPeriod === period.periodNum
+                                                ? <ChevronUp className="w-4 h-4" />
+                                                : <ChevronDown className="w-4 h-4" />
+                                            }
                                         </div>
                                     </div>
 
-                                    {/* ─── Remove Confirmation Overlay ─── */}
-                                    {confirmRemovePeriod === slot.period && (
-                                        <div className="animate-fade-in rounded-xl" style={{
-                                            position: 'absolute',
-                                            inset: 0,
-                                            background: 'rgba(0, 0, 0, 0.85)',
-                                            backdropFilter: 'blur(4px)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '1rem',
-                                            zIndex: 10,
-                                            borderRadius: 'inherit',
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <AlertTriangle className="w-5 h-5 text-red-400" />
-                                                <p style={{ color: 'white', fontWeight: 600, fontSize: '0.95rem' }}>
-                                                    Remove Period P{slot.period}?
-                                                </p>
-                                            </div>
-                                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>
-                                                {slot.subjectName ? `${slot.subjectName} — ` : ''}This action cannot be undone
+                                    {/* Expanded Content */}
+                                    {expandedPeriod === period.periodNum && (
+                                        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+
+                                            {/* Teacher PIN Input */}
+                                            {teacher && !period.isVerified && (
+                                                <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                                                    <label className="text-xs text-orange-400 flex items-center gap-1 mb-2">
+                                                        <Key className="w-3 h-3" />
+                                                        Teacher Verification Required
+                                                    </label>
+                                                    <div className="flex gap-2 items-center">
+                                                        <input
+                                                            type="text"
+                                                            value={verificationCodes[period.periodNum] || ''}
+                                                            onChange={(e) => handleCodeInput(period.periodNum, e.target.value)}
+                                                            placeholder="Enter 4-digit PIN"
+                                                            className="input flex-1 text-center text-xl tracking-widest font-mono"
+                                                            maxLength={4}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <span className="text-xs text-[var(--text-dim)]">
+                                                            Ask {teacher.name}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {teacher && period.isVerified && (
+                                                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle className="w-4 h-4 text-green-400" />
+                                                        <span className="text-sm text-green-400">
+                                                            Verified by {teacher.name}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs text-green-400/60">
+                                                        🔒 Locked
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            <p className="text-xs text-[var(--text-dim)] mb-3">
+                                                {period.isVerified
+                                                    ? 'This period is verified and locked. Changes not allowed.'
+                                                    : 'Tap roll numbers to mark absent (red = absent)'
+                                                }
                                             </p>
-                                            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={cancelRemovePeriod}
-                                                    style={{
-                                                        padding: '0.5rem 1.5rem',
-                                                        borderRadius: '9999px',
-                                                        border: '1px solid rgba(255,255,255,0.15)',
-                                                        background: 'transparent',
-                                                        color: 'white',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 500,
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={confirmAndRemovePeriod}
-                                                    style={{
-                                                        padding: '0.5rem 1.5rem',
-                                                        borderRadius: '9999px',
-                                                        border: '1px solid rgba(239,68,68,0.4)',
-                                                        background: 'rgba(239,68,68,0.15)',
-                                                        color: '#f87171',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 600,
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                    }}
-                                                >
-                                                    Yes, Remove
-                                                </button>
+                                            <div className={`grid grid-cols-7 sm:grid-cols-10 gap-2 ${period.isVerified ? 'opacity-60' : ''}`}>
+                                                {[...Array(classStrength)].map((_, i) => {
+                                                    const roll = i + 1;
+                                                    const isAbsent = period.absentRollNumbers.includes(roll);
+
+                                                    return (
+                                                        <button
+                                                            key={roll}
+                                                            onClick={() => !period.isVerified && toggleAbsent(period.periodNum, roll)}
+                                                            disabled={period.isVerified}
+                                                            className={`aspect-square rounded-lg text-sm font-medium transition-all ${period.isVerified
+                                                                ? 'cursor-not-allowed'
+                                                                : ''
+                                                                } ${isAbsent
+                                                                    ? 'bg-red-500/30 text-red-300 border border-red-500/50'
+                                                                    : 'bg-white/5 text-white/70 border border-white/10 hover:border-white/30'
+                                                                }`}
+                                                        >
+                                                            {roll}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
+                                            {period.absentRollNumbers.length > 0 && (
+                                                <p className="text-sm text-[var(--text-dim)] mt-3">
+                                                    Absent: {period.absentRollNumbers.join(', ')}
+                                                </p>
+                                            )}
                                         </div>
                                     )}
-
-                                    {/* Quick actions */}
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <button
-                                            onClick={() => markAllPresent(index)}
-                                            className="text-xs px-3 py-1.5 rounded-full border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 transition flex items-center gap-1.5"
-                                            disabled={isDateLocked}
-                                        >
-                                            <CheckCircle className="w-3 h-3" />
-                                            All Present
-                                        </button>
-                                        {index > 0 && (
-                                            <button
-                                                onClick={() => copyFromPrevious(index)}
-                                                className="text-xs px-3 py-1.5 rounded-full border border-white/10 text-[var(--text-dim)] hover:text-white hover:border-white/20 transition flex items-center gap-1.5"
-                                                disabled={isDateLocked}
-                                            >
-                                                <RotateCcw className="w-3 h-3" />
-                                                Copy P{periods[index - 1]?.period}
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Bulk input */}
-                                    <div className="mb-3 relative">
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Type absent roll numbers (e.g. 1, 5, 12, 23)"
-                                                value={absentInputs[index] || ''}
-                                                onChange={(e) => handleBulkAbsentInput(index, e.target.value)}
-                                                className="input flex-1 text-sm !rounded-xl"
-                                                disabled={isDateLocked || (isScanning && scanningPeriodIndex === index)}
-                                            />
-                                            <button
-                                                onClick={() => handleCameraButtonClick(index)}
-                                                disabled={isDateLocked || (isScanning && scanningPeriodIndex === index)}
-                                                className="px-4 bg-white/5 border border-white/10 text-[var(--text-dim)] hover:bg-white/10 hover:text-white rounded-xl transition flex items-center justify-center disabled:opacity-50"
-                                                title="Scan Logbook"
-                                            >
-                                                {isScanning && scanningPeriodIndex === index ? (
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                                ) : (
-                                                    <Camera className="w-5 h-5" />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Grid */}
-                                    <div className="grid grid-cols-7 sm:grid-cols-10 gap-1.5">
-                                        {classRollNumbers.map((roll) => {
-                                            const isAbsent = (absentees[index] || []).includes(roll);
-
-                                            return (
-                                                <button
-                                                    key={roll}
-                                                    onClick={() => toggleAbsent(index, roll)}
-                                                    className={`grid-box ${isAbsent ? 'absent' : 'present'}`}
-                                                    disabled={isDateLocked}
-                                                >
-                                                    {roll}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
                                 </div>
                             );
                         })}
+
+                        {/* Add Period Form */}
+                        {showAddForm ? (
+                            <div className="card border-blue-500/30 bg-blue-900/10">
+                                <h3 className="text-sm uppercase text-blue-400 mb-3">Add New Period</h3>
+                                <div className="flex gap-2">
+                                    {isCustomSubject ? (
+                                        <input
+                                            type="text"
+                                            placeholder="Enter custom subject name..."
+                                            value={newSubjectName}
+                                            onChange={(e) => setNewSubjectName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && addPeriod()}
+                                            className="input flex-1"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <CustomSelect
+                                            options={subjects.map(s => ({
+                                                value: s._id,
+                                                label: s.name,
+                                                subLabel: s.teacherName ? `Teacher: ${s.teacherName}` : 'No Teacher Assigned'
+                                            }))}
+                                            value={selectedSubjectId}
+                                            onChange={(val) => {
+                                                setSelectedSubjectId(val);
+                                                const sub = subjects.find(s => s._id === val);
+                                                setNewSubjectName(sub ? sub.name : '');
+                                            }}
+                                            placeholder="-- Select Subject --"
+                                            className="flex-1 min-w-[200px]"
+                                        />
+                                    )}
+                                    {isCustomSubject && (
+                                        <button
+                                            onClick={() => setIsCustomSubject(false)}
+                                            className="btn btn-ghost px-3 text-xs"
+                                            title="Back to list"
+                                        >
+                                            Use List
+                                        </button>
+                                    )}
+                                    <button onClick={addPeriod} className="btn btn-primary px-4">
+                                        Add
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowAddForm(false);
+                                            setNewSubjectName('');
+                                            setSelectedSubjectId('');
+                                            setIsCustomSubject(false);
+                                        }}
+                                        className="btn btn-outline px-4"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="w-full py-3 border-2 border-dashed border-white/20 rounded-xl text-[var(--text-dim)] hover:border-white/40 hover:text-white transition flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Period
+                            </button>
+                        )}
                     </div>
                 )}
 
-                {/* ─── Add Class Button ─── */}
-                <div className="text-center my-6">
-                    <button
-                        onClick={addPeriod}
-                        className="btn btn-outline inline-flex w-auto px-8 items-center gap-2"
-                        disabled={isDateLocked}
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Period
-                    </button>
-                    {periods.length === 0 && (
-                        <p className="text-[var(--text-dim)] text-sm mt-4">
-                            No classes scheduled for {getDayName(selectedDate)}.<br />
-                            <span className="text-xs">Tap "Add Period" to manually add classes.</span>
-                        </p>
-                    )}
-                </div>
-
-                {/* ─── Save Button — Fixed at bottom ─── */}
-                {periods.length > 0 && !isDateLocked && (
-                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent z-50">
+                {/* Save Button */}
+                {(periods.length > 0 || hasChanges) && (
+                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent">
                         <div className="max-w-4xl mx-auto">
                             <button
-                                onClick={submitAttendance}
-                                disabled={saving}
-                                className={`btn btn-primary w-full flex items-center justify-center gap-2 ${saving ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                onClick={saveAttendance}
+                                disabled={!hasChanges && periods.length === 0}
+                                className={`btn w-full flex items-center justify-center gap-2 ${hasChanges
+                                    ? 'btn-primary'
+                                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                                    }`}
                             >
-                                {saving ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="w-4 h-4" />
-                                        {hasModifications ? 'Save Changes' : isViewingPastDate ? 'Update Attendance' : 'Save Attendance'}
-                                    </>
-                                )}
+                                <Save className="w-4 h-4" />
+                                {hasChanges ? 'Save & Verify' : 'No Changes'}
                             </button>
                         </div>
                     </div>

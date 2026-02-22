@@ -10,10 +10,7 @@ const nextConfig = {
         imageSizes: [16, 32, 48, 64, 96, 128, 256],
     },
 
-    // SWC minification (faster than Terser)
-    swcMinify: true,
-
-    // Remove x-powered-by header
+    // Disable x-powered-by header
     poweredByHeader: false,
 
     // Compress responses

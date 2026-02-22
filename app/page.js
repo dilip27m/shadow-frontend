@@ -120,6 +120,15 @@ export default function Home() {
     const handleStudentLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
+
+        // Validate roll number
+        const rollNo = parseInt(rollNumber);
+        if (!rollNo || rollNo < 1) {
+            notify({ message: "Please enter a valid roll number (1 or higher)", type: 'error' });
+            setLoading(false);
+            return;
+        }
+
         try {
             const res = await api.post('/student/access', {
                 className: className.trim(),
@@ -129,10 +138,9 @@ export default function Home() {
             const classId = res.data.classId;
             const normalizedRollNumber = res.data.rollNumber;
             localStorage.setItem('studentClassId', classId);
-            localStorage.setItem('studentRoll', normalizedRollNumber);
-            localStorage.setItem('studentClassName', res.data.className || className.trim());
-            localStorage.setItem('studentToken', res.data.token);
-            router.push(`/student/${classId}/${normalizedRollNumber}`);
+            localStorage.setItem('studentRoll', rollNo.toString());
+
+            router.push(`/student/${classId}/${rollNo}`);
         } catch (err) {
             notify({ message: err.response?.data?.error || "Class or roll number not found.", type: 'error' });
             setLoading(false);
@@ -176,7 +184,37 @@ export default function Home() {
  
 
 
-                    </div>
+                {/* Student Login Section */}
+                <div className="max-w-md mx-auto mb-16">
+                    <form onSubmit={handleStudentLogin} className="card">
+                        <h2 className="text-sm uppercase text-[var(--text-dim)] mb-4 text-center">Student Access</h2>
+
+                        <input
+                            type="text"
+                            className="input mb-4"
+                            placeholder="Class Name (e.g. S6 CSE-B)"
+                            value={className}
+                            onChange={(e) => setClassName(e.target.value)}
+                            required
+                        />
+
+                        <input
+                            type="number"
+                            className="input mb-4"
+                            placeholder="Roll Number (e.g. 1-100)"
+                            value={rollNumber}
+                            onChange={(e) => setRollNumber(e.target.value)}
+                            required
+                        />
+
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? 'Loading...' : 'View My Attendance'}
+                        </button>
+                    </form>
+
+                    <p className="text-center text-xs text-[var(--text-dim)] mt-4">
+                        Teachers & Class Reps: Use the buttons in the top-right corner
+                    </p>
                 </div>
             </section>
 
