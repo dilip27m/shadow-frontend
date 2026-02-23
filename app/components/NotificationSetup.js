@@ -32,8 +32,19 @@ export default function NotificationSetup({ classId, rollNumber }) {
 
             // Pre-fetch VAPID key so subscribe() doesn't need a network call mid-gesture
             api.get('/push/vapid-key')
-                .then(res => setVapidKey(res.data.publicKey))
-                .catch(err => console.error("Failed to fetch VAPID key:", err));
+                .then(res => {
+                    if (res.data.publicKey) {
+                        setVapidKey(res.data.publicKey);
+                    } else {
+                        console.error("VAPID key missing from response:", res.data);
+                        setError("Push not configured on server.");
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to fetch VAPID key:", err);
+                    const msg = err.response?.data?.error || "Could not connect to push service.";
+                    setError(msg);
+                });
 
             // Register SW eagerly so it's active when user clicks Enable
             navigator.serviceWorker.register('/sw.js')
