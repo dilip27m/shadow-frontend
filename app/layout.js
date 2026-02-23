@@ -31,7 +31,7 @@ export const metadata = {
     title: 'Shadow',
   },
   icons: {
-    icon: '/logo.png',
+    icon: '/logo_92.png',
     apple: '/icon-192.png',
   },
   openGraph: {
