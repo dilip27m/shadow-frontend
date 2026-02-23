@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/app/components/Navbar';
+import NotificationSetup from '@/app/components/NotificationSetup';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
 import useSWR, { mutate } from 'swr';
@@ -303,8 +304,66 @@ export default function StudentDashboard() {
                 </p>
               )}
             </div>
+            <NotificationSetup classId={classId} rollNumber={rollNumber} />
           </div>
         </div>
+
+        {/* Recent Announcements */}
+        {allAnnouncements.length > 0 && (
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-sm uppercase text-[var(--text-dim)] flex items-center gap-2">
+                <span>📢</span> Recent Announcements
+              </h2>
+              <Link
+                href={`/student/${classId}/${rollNumber}/attention`}
+                className="text-xs text-blue-400 hover:text-blue-300 transition"
+              >
+                View All →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {allAnnouncements.slice(0, 3).map(a => {
+                const deadline = getDeadlineStatus(a.dueDate);
+                const timeAgo = (() => {
+                  const diff = Date.now() - new Date(a.createdAt).getTime();
+                  const mins = Math.floor(diff / 60000);
+                  if (mins < 60) return `${mins}m ago`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `${hrs}h ago`;
+                  const days = Math.floor(hrs / 24);
+                  return `${days}d ago`;
+                })();
+                return (
+                  <div key={a._id} className="card relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+                    <div className="pl-2">
+                      <div className="flex justify-between items-start mb-1">
+                        <h3 className="font-semibold text-sm text-white">{a.title}</h3>
+                        {deadline && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ml-2 ${deadline.type === 'danger' ? 'bg-red-900/40 text-red-400' :
+                              deadline.type === 'urgent' ? 'bg-orange-900/40 text-orange-400' :
+                                deadline.type === 'warning' ? 'bg-yellow-900/40 text-yellow-400' :
+                                  'bg-green-900/40 text-green-400'
+                            }`}>
+                            {deadline.text}
+                          </span>
+                        )}
+                      </div>
+                      {a.description && (
+                        <p className="text-xs text-[var(--text-dim)] line-clamp-2 mb-2">{a.description}</p>
+                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] bg-[#222] px-2 py-0.5 rounded text-[var(--text-dim)] uppercase font-bold tracking-wider">{a.subjectName || 'General'}</span>
+                        <span className="text-[10px] text-[var(--text-dim)]">{timeAgo}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Urgent Deadlines (Due in 24h) */}
         {urgentTasks.length > 0 && (

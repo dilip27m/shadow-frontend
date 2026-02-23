@@ -1,5 +1,6 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import NotificationProvider from './components/Notification';
 
 const inter = Inter({
@@ -45,6 +46,13 @@ export default function RootLayout({ children }) {
         <NotificationProvider>
           {children}
         </NotificationProvider>
+        <Script id="register-sw" strategy="afterInteractive">{`
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function(err) {
+              console.log('SW registration failed:', err);
+            });
+          }
+        `}</Script>
       </body>
     </html>
   );

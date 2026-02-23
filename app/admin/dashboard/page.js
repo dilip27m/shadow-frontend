@@ -5,7 +5,7 @@ import {
     Save, Plus, X, Calendar as CalendarIcon,
     RotateCcw, FileText, Clock, CheckCircle,
     AlertTriangle, Loader2, Camera, Lock, LockOpen,
-    ZoomIn, ZoomOut, Move, Crop as CropIcon, RefreshCw
+    ZoomIn, ZoomOut, Move, Crop as CropIcon, RefreshCw, Smartphone
 } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import Calendar from '@/app/components/Calendar';
@@ -79,6 +79,8 @@ export default function AdminDashboard() {
     const [isDateLocked, setIsDateLocked] = useState(false);
     const [autoRelockArmed, setAutoRelockArmed] = useState(false);
     const [imageToCrop, setImageToCrop] = useState(null);
+    const [showScanTypeModal, setShowScanTypeModal] = useState(false);
+    const [scanType, setScanType] = useState('handwritten'); // 'handwritten' or 'app'
     const fileInputRef = useRef(null);
     const autoRelockTimerRef = useRef(null);
     const cropperRef = useRef(null);
@@ -251,7 +253,14 @@ export default function AdminDashboard() {
     const handleCameraButtonClick = (periodIdx) => {
         if (isDateLocked) return;
         setScanningPeriodIndex(periodIdx);
+        setShowScanTypeModal(true);
+    };
+
+    const selectScanTypeAndOpenFile = (type) => {
+        setScanType(type);
+        setShowScanTypeModal(false);
         if (fileInputRef.current) {
+            fileInputRef.current.value = '';
             fileInputRef.current.click();
         }
     };
@@ -343,7 +352,26 @@ export default function AdminDashboard() {
                         notify({ message: "Full page scanned successfully! Please select subjects.", type: 'success' });
                     }
                 }
+            } else if (scanType === 'app') {
+                // Logbook App Screenshot scan
+                const res = await api.post('/ai/scan-logbook-app', { imageBase64: compressedBase64 });
+                const absentStr = res.data.absent || '';
+                const lateStr = res.data.late || '';
+                if (!absentStr && !lateStr) {
+                    notify({ message: "All students appear present in the image", type: 'success' });
+                    handleBulkAbsentInput(currentIndex, '');
+                } else {
+                    handleBulkAbsentInput(currentIndex, absentStr);
+                    const lateCount = lateStr ? lateStr.split(',').filter(s => s.trim()).length : 0;
+                    const absentCount = absentStr ? absentStr.split(',').filter(s => s.trim()).length : 0;
+                    let msg = `App scanned: ${absentCount} absent`;
+                    if (lateCount > 0) {
+                        msg += `, ${lateCount} late (marked as present)`;
+                    }
+                    notify({ message: msg, type: 'success' });
+                }
             } else {
+                // Handwritten logbook scan (existing flow)
                 const res = await api.post('/ai/scan-logbook', { imageBase64: compressedBase64 });
                 const rollNumbersStr = res.data.rollNumbers || '';
                 if (!rollNumbersStr) {
@@ -660,6 +688,49 @@ export default function AdminDashboard() {
                 onChange={handleImageUpload}
                 className="hidden"
             />
+
+            {/* ─── Scan Type Selector Modal ─── */}
+            {showScanTypeModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="w-full max-w-sm glass-card !mb-0 shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-bold">Choose Scan Type</h2>
+                            <button
+                                onClick={() => { setShowScanTypeModal(false); setScanningPeriodIndex(null); }}
+                                className="p-2 bg-white/5 rounded-full hover:bg-white/10 transition border border-white/10"
+                            >
+                                <X className="w-4 h-4 text-white" />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => selectScanTypeAndOpenFile('handwritten')}
+                                className="w-full py-4 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex items-center gap-4 text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center flex-shrink-0">
+                                    <Camera className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-white">Handwritten Logbook</p>
+                                    <p className="text-xs text-[var(--text-dim)] mt-0.5">Scan photo of written absentee numbers</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => selectScanTypeAndOpenFile('app')}
+                                className="w-full py-4 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition flex items-center gap-4 text-left"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-purple-500/15 border border-purple-500/25 flex items-center justify-center flex-shrink-0">
+                                    <Smartphone className="w-5 h-5 text-purple-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-white">Logbook App Screenshot</p>
+                                    <p className="text-xs text-[var(--text-dim)] mt-0.5">Scan color-coded grid (green/red/yellow)</p>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {imageToCrop && (
                 <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 p-4 sm:p-6 animate-fade-in backdrop-blur-sm">
