@@ -59,6 +59,14 @@ export default function StudentDashboard() {
     }
   );
 
+  const announcementsKey = classId ? `/announcements/${classId}` : null;
+  const { data: announcementsResponse } = useSWR(
+    announcementsKey,
+    fetcher,
+    swrConfig
+  );
+  const allAnnouncements = announcementsResponse?.announcements || [];
+
   const { data: reportsResponse } = useSWR(
     reportsKey,
     fetcher,
@@ -140,7 +148,19 @@ export default function StudentDashboard() {
     }
   };
 
+  const getDeadlineStatus = (dueDate) => {
+    if (!dueDate) return null;
+    const now = new Date();
+    const due = new Date(dueDate);
+    const diffMs = due - now;
+    const diffDays = Math.ceil(diffMs / 86400000);
 
+    if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, type: 'danger' };
+    if (diffDays === 0) return { text: 'Due today!', type: 'urgent' };
+    if (diffDays === 1) return { text: 'Due tomorrow', type: 'urgent' };
+    if (diffDays <= 3) return { text: `${diffDays}d left`, type: 'warning' };
+    return { text: `${diffDays}d left`, type: 'safe' };
+  };
 
   // Fetching is now handled by SWR and localStorage caching above
 

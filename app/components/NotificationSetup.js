@@ -19,6 +19,8 @@ export default function NotificationSetup({ classId, rollNumber }) {
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [loading, setLoading] = useState(false);
     const [supported, setSupported] = useState(false);
+    const [vapidKey, setVapidKey] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         // Check if push notifications are supported
@@ -28,21 +30,37 @@ export default function NotificationSetup({ classId, rollNumber }) {
         if (isSupported) {
             setPermission(Notification.permission);
 
-            // Check if already subscribed
-            navigator.serviceWorker.ready.then(registration => {
-                registration.pushManager.getSubscription().then(sub => {
+            // Pre-fetch VAPID key so subscribe() doesn't need a network call mid-gesture
+            api.get('/push/vapid-key')
+                .then(res => setVapidKey(res.data.publicKey))
+                .catch(err => console.error("Failed to fetch VAPID key:", err));
+
+            // Register SW eagerly so it's active when user clicks Enable
+            navigator.serviceWorker.register('/sw.js')
+                .then(() => navigator.serviceWorker.ready)
+                .then(registration => {
+                    return registration.pushManager.getSubscription();
+                })
+                .then(sub => {
                     setIsSubscribed(!!sub);
-                });
-            });
+                })
+                .catch(err => console.error("SW init error:", err));
         }
     }, []);
 
     const subscribe = useCallback(async () => {
         if (!supported || loading) return;
+        setError(null);
+
+        if (!vapidKey) {
+            setError("Push service still loading. Please wait a moment and try again.");
+            return;
+        }
+
         setLoading(true);
 
         try {
-            // Request permission
+            // 1. Request permission first (must be in direct user-gesture context)
             const perm = await Notification.requestPermission();
             setPermission(perm);
 
@@ -51,18 +69,16 @@ export default function NotificationSetup({ classId, rollNumber }) {
                 return;
             }
 
-            // Get VAPID public key from backend
-            const keyRes = await api.get('/push/vapid-key');
-            const vapidPublicKey = keyRes.data.publicKey;
-
-            // Subscribe via Push API
+            // 2. Ensure the SW is fully active — .ready guarantees an active worker
             const registration = await navigator.serviceWorker.ready;
+
+            // 3. Subscribe via Push API (VAPID key was pre-fetched, no network delay here)
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                applicationServerKey: urlBase64ToUint8Array(vapidKey)
             });
 
-            // Send subscription to backend
+            // 4. Send subscription to backend
             await api.post('/push/subscribe', {
                 classId,
                 rollNumber,
@@ -72,10 +88,11 @@ export default function NotificationSetup({ classId, rollNumber }) {
             setIsSubscribed(true);
         } catch (err) {
             console.error('Push subscription error:', err);
+            setError("Failed to enable notifications. Please try again.");
         } finally {
             setLoading(false);
         }
-    }, [classId, rollNumber, supported, loading]);
+    }, [classId, rollNumber, supported, loading, vapidKey]);
 
     const unsubscribe = useCallback(async () => {
         if (!supported || loading) return;
@@ -133,17 +150,22 @@ export default function NotificationSetup({ classId, rollNumber }) {
     }
 
     return (
-        <button
-            onClick={subscribe}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 hover:bg-blue-500/15 transition animate-fade-in"
-        >
-            {loading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-                <Bell className="w-3.5 h-3.5" />
+        <div className="flex flex-col items-end gap-1">
+            <button
+                onClick={subscribe}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 hover:bg-blue-500/15 transition animate-fade-in"
+            >
+                {loading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                    <Bell className="w-3.5 h-3.5" />
+                )}
+                <span>Enable Notifications</span>
+            </button>
+            {error && (
+                <span className="text-[10px] text-red-400 max-w-[200px] text-right">{error}</span>
             )}
-            <span>Enable Notifications</span>
-        </button>
+        </div>
     );
 }

@@ -1,5 +1,10 @@
 // Shadow Push Notification Service Worker
 
+// Install immediately — don't wait for old SW to retire
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
 self.addEventListener('push', (event) => {
     if (!event.data) return;
 
