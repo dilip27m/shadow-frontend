@@ -2,6 +2,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import NotificationProvider from './components/Notification';
+import { ConfirmProvider } from './components/ConfirmDialog';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -44,7 +45,9 @@ export default function RootLayout({ children }) {
     <html lang="en" className={inter.variable}>
       <body style={{ fontFamily: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <NotificationProvider>
-          {children}
+          <ConfirmProvider>
+            {children}
+          </ConfirmProvider>
         </NotificationProvider>
         <Script id="register-sw" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {

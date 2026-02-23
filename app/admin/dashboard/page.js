@@ -10,6 +10,7 @@ import {
 import Navbar from '@/app/components/Navbar';
 import Calendar from '@/app/components/Calendar';
 import api from '@/utils/api';
+import { useConfirm } from '@/app/components/ConfirmDialog';
 import { useNotification } from '@/app/components/Notification';
 import Cropper from "react-cropper";
 import "cropperjs/dist/cropper.css";
@@ -54,6 +55,7 @@ const AUTO_RELOCK_MS = 2 * 60 * 1000;
 export default function AdminDashboard() {
     const router = useRouter();
     const notify = useNotification();
+    const confirm = useConfirm();
     const [loading, setLoading] = useState(true);
     const [periods, setPeriods] = useState([]);
     const [classId, setClassId] = useState(null);
@@ -539,7 +541,7 @@ export default function AdminDashboard() {
         notify({ message: `Copied ${prevAbsentees.length} absentee(s) from P${periods[periodIdx - 1]?.period || periodIdx}`, type: 'success' });
     };
 
-    const unlockDateForEdit = () => {
+    const unlockDateForEdit = async () => {
         const readableDate = selectedDate
             ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
                 weekday: 'short',
@@ -549,7 +551,11 @@ export default function AdminDashboard() {
             })
             : 'this date';
 
-        const confirmed = window.confirm(`Unlock attendance for ${readableDate}?`);
+        const confirmed = await confirm(
+            'Unlock Attendance?',
+            `Are you sure you want to unlock attendance for ${readableDate}?`,
+            { confirmText: 'Unlock', type: 'danger' }
+        );
         if (!confirmed) return;
 
         setIsDateLocked(false);

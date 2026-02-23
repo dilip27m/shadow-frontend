@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/app/components/Navbar';
 import NotificationSetup from '@/app/components/NotificationSetup';
 import api from '@/utils/api';
+import { useConfirm } from '@/app/components/ConfirmDialog';
 import { useNotification } from '@/app/components/Notification';
 import useSWR, { mutate } from 'swr';
 
@@ -13,6 +14,7 @@ export default function StudentDashboard() {
   const { classId, rollNumber } = params;
   const router = useRouter();
   const notify = useNotification();
+  const confirm = useConfirm();
 
   const [minPercentage, setMinPercentage] = useState(75);
 
@@ -246,7 +248,8 @@ export default function StudentDashboard() {
   };
 
   const handleDeleteReport = async (reportId) => {
-    if (!confirm('Are you sure you want to delete this report?')) return;
+    const ok = await confirm('Delete Report?', 'Are you sure you want to delete this report?', { confirmText: 'Delete', type: 'danger' });
+    if (!ok) return;
     try {
       await api.delete(`/reports/delete/${reportId}`);
       notify({ message: "Report deleted successfully", type: 'success' });
@@ -346,9 +349,9 @@ export default function StudentDashboard() {
                         <h3 className="font-bold text-sm text-red-400">{a.title}</h3>
                         {deadline && (
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ml-2 ${deadline.type === 'danger' ? 'bg-red-900/40 text-red-400' :
-                              deadline.type === 'urgent' ? 'bg-orange-900/40 text-orange-400' :
-                                deadline.type === 'warning' ? 'bg-yellow-900/40 text-yellow-400' :
-                                  'bg-green-900/40 text-green-400'
+                            deadline.type === 'urgent' ? 'bg-orange-900/40 text-orange-400' :
+                              deadline.type === 'warning' ? 'bg-yellow-900/40 text-yellow-400' :
+                                'bg-green-900/40 text-green-400'
                             }`}>
                             {deadline.text}
                           </span>
