@@ -72,7 +72,7 @@ export default function Home() {
                     // Token is valid — renew and redirect
                     localStorage.setItem('token', res.data.token);
                     localStorage.setItem('adminClassId', res.data.classId);
-                    router.push('/admin/dashboard');
+                    router.push('/admin/attention');
                 })
                 .catch(() => {
                     localStorage.removeItem('adminClassId');
@@ -97,7 +97,7 @@ export default function Home() {
                 .then(() => api.get(`/class/${studentClassId}`))
                 .then(() => {
                     // Class still exists — redirect to student dashboard
-                    router.push(`/student/${studentClassId}/${studentRoll}`);
+                    router.push(`/student/${studentClassId}/${studentRoll}/attention`);
                 })
                 .catch(() => {
                     localStorage.removeItem('studentClassId');
@@ -132,7 +132,7 @@ export default function Home() {
             localStorage.setItem('studentRoll', normalizedRollNumber);
             localStorage.setItem('studentClassName', res.data.className || className.trim());
             localStorage.setItem('studentToken', res.data.token);
-            router.push(`/student/${classId}/${normalizedRollNumber}`);
+            router.push(`/student/${classId}/${normalizedRollNumber}/attention`);
         } catch (err) {
             notify({ message: err.response?.data?.error || "Class or roll number not found.", type: 'error' });
             setLoading(false);
@@ -158,22 +158,22 @@ export default function Home() {
                 <div className="max-w-5xl mx-auto px-4 pt-16 pb-12 relative">
                     <div className="text-center">
                         {/* Badge */}
-                      
+
 
                         {/* Headline */}
                         <h1 className="animate-fade-up delay-100 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]"
                             style={{ letterSpacing: '-0.04em' }}>
                             <span className="bg-gradient-to-b from-white via-white to-gray-500 bg-clip-text text-transparent">
-                                Bunk class smartly,
+                                Track attendance smartly,
                             </span>
                             <br />
                             <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-violet-400 bg-clip-text text-transparent">
-                                instead of blindly.
+                                plan your days wisely.
                             </span>
                         </h1>
 
                         {/* Subhead */}
- 
+
 
 
                     </div>

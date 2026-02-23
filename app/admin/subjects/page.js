@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import { Edit2, Trash2, Plus, BookOpen, X, Check } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
+import { useConfirm } from '@/app/components/ConfirmDialog';
 import { useNotification } from '@/app/components/Notification';
 
 export default function SubjectManager() {
     const router = useRouter();
     const notify = useNotification();
+    const confirm = useConfirm();
     const [loading, setLoading] = useState(true);
     const [classId, setClassId] = useState(null);
     const [subjects, setSubjects] = useState([]);
@@ -73,7 +75,8 @@ export default function SubjectManager() {
     };
 
     const deleteSubject = async (subjectId) => {
-        if (!confirm('Are you sure you want to delete this subject?')) return;
+        const ok = await confirm('Delete Subject?', 'Are you sure you want to delete this subject? This cannot be undone.', { confirmText: 'Delete', type: 'danger' });
+        if (!ok) return;
 
         try {
             await api.delete(`/class/${classId}/delete-subject/${subjectId}`);

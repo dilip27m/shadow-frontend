@@ -92,7 +92,7 @@ export default function Calendar({ selectedDate, onSelectDate, attendanceDates =
                     const today = new Date().toISOString().split('T')[0];
 
                     // If enableAllDates=true, allow everything
-                    // Else if allowFuture=true (bunk), block past (except today)
+                    // Else if allowFuture=true (skip), block past (except today)
                     // Else (attendance), block future (except today)
                     let isDisabled = false;
                     if (!enableAllDates) {

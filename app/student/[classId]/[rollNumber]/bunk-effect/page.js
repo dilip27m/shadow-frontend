@@ -100,14 +100,14 @@ export default function BunkEffect() {
     const getImpact = (subject) => {
         const bunkCount = bunkCounts[subject._id] || 0;
         const afterTotal = subject.total + bunkCount;
-        const afterAttended = subject.attended; // bunking means not attending
+        const afterAttended = subject.attended; // skipping means not attending
         const afterPercentage = afterTotal === 0 ? 100 : (afterAttended / afterTotal) * 100;
         const percentDrop = subject.percentage - afterPercentage;
 
         const isSafe = afterPercentage >= minPercentage + 5;
         const isDanger = afterPercentage < minPercentage;
 
-        // Calculate max classes you can bunk while staying at minPercentage
+        // Calculate max classes you can skip while staying at minPercentage
         const maxBunkable = Math.max(0, Math.floor((subject.attended / (minPercentage / 100)) - subject.total));
 
         // Calculate classes needed to recover if below minimum
@@ -147,7 +147,7 @@ export default function BunkEffect() {
             <div className="max-w-3xl mx-auto px-4 py-8">
 
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold">Bunk Effect Calculator</h1>
+                    <h1 className="text-2xl font-bold">Skip Effect Calculator</h1>
                     <p className="text-[var(--text-dim)]">{className} - Roll No. {rollNumber}</p>
                 </div>
 
@@ -155,7 +155,7 @@ export default function BunkEffect() {
                 <div className="card mb-6 bg-blue-900/10 border-blue-500/30">
                     <h2 className="text-sm font-semibold text-blue-400 mb-2">How it works</h2>
                     <ul className="text-sm text-[var(--text-dim)] space-y-1">
-                        <li>• Set how many classes you plan to bunk for each subject</li>
+                        <li>• Set how many classes you plan to skip for each subject</li>
                         <li>• See the impact on your attendance percentage instantly</li>
                         <li>• Minimum attendance threshold: <span className="text-white font-semibold">{minPercentage}%</span></li>
                     </ul>
@@ -167,7 +167,7 @@ export default function BunkEffect() {
                         <div className="flex justify-between items-center">
                             <div>
                                 <p className="text-sm font-semibold text-orange-400">
-                                    Planning to bunk {totalBunks} class{totalBunks > 1 ? 'es' : ''} total
+                                    Planning to skip {totalBunks} class{totalBunks > 1 ? 'es' : ''} total
                                 </p>
                                 <p className="text-xs text-[var(--text-dim)] mt-1">
                                     {Object.entries(bunkCounts).filter(([_, c]) => c > 0).map(([id, c]) => {
@@ -198,7 +198,7 @@ export default function BunkEffect() {
                                     <div>
                                         <h3 className="font-semibold text-lg">{subject.subjectName}</h3>
                                         <p className="text-xs text-[var(--text-dim)]">
-                                            {subject.attended}/{subject.total} classes attended · Can bunk {impact.maxBunkable} more
+                                            {subject.attended}/{subject.total} classes attended · Can skip {impact.maxBunkable} more
                                         </p>
                                     </div>
                                     <div className="text-right">
@@ -207,9 +207,9 @@ export default function BunkEffect() {
                                     </div>
                                 </div>
 
-                                {/* Bunk Counter */}
+                                {/* Skip Counter */}
                                 <div className="flex items-center justify-between mb-4">
-                                    <label className="text-sm text-[var(--text-dim)]">Classes to bunk</label>
+                                    <label className="text-sm text-[var(--text-dim)]">Classes to skip</label>
                                     <div className="flex items-center gap-3">
                                         <button
                                             onClick={() => decrementBunk(subject._id)}
@@ -245,7 +245,7 @@ export default function BunkEffect() {
                                                 <p className="text-xs text-[var(--text-dim)]">{subject.attended}/{subject.total}</p>
                                             </div>
                                             <div className={`p-3 rounded-lg border ${impact.isDanger ? 'bg-red-900/10 border-red-500/30' : impact.isSafe ? 'bg-green-900/10 border-green-500/30' : 'bg-orange-900/10 border-orange-500/30'}`}>
-                                                <p className="text-xs text-[var(--text-dim)] mb-1">After Bunk</p>
+                                                <p className="text-xs text-[var(--text-dim)] mb-1">After Skip</p>
                                                 <p className={`text-xl font-bold ${impact.isDanger ? 'text-red-400' : impact.isSafe ? 'text-green-400' : 'text-orange-400'}`}>
                                                     {impact.afterPercentage.toFixed(1)}%
                                                 </p>
@@ -271,22 +271,22 @@ export default function BunkEffect() {
                                             impact.isSafe ? 'bg-green-900/20 text-green-400' :
                                                 'bg-orange-900/20 text-orange-400'
                                             }`}>
-                                            {impact.isSafe && `✓ Still safe after bunking ${bunkCount} class${bunkCount > 1 ? 'es' : ''}`}
+                                            {impact.isSafe && `✓ Still safe after skipping ${bunkCount} class${bunkCount > 1 ? 'es' : ''}`}
                                             {!impact.isSafe && !impact.isDanger && `⚠ Borderline! Be careful, you're close to ${minPercentage}%`}
                                             {impact.isDanger && `✗ Below ${minPercentage}%! Attend ${impact.classesToRecover} more class${impact.classesToRecover > 1 ? 'es' : ''} to recover`}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Quick info when no bunk selected */}
+                                {/* Quick info when no skip selected */}
                                 {!hasImpact && (
                                     <div className="text-center py-1">
                                         <p className={`text-xs ${impact.maxBunkable > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                             {impact.maxBunkable > 0
-                                                ? `You can safely bunk up to ${impact.maxBunkable} class${impact.maxBunkable > 1 ? 'es' : ''}`
+                                                ? `You can safely skip up to ${impact.maxBunkable} class${impact.maxBunkable > 1 ? 'es' : ''}`
                                                 : subject.percentage < minPercentage
-                                                    ? `⚠ Already below ${minPercentage}% — cannot bunk`
-                                                    : `Borderline — bunking is risky`
+                                                    ? `⚠ Already below ${minPercentage}% — cannot skip`
+                                                    : `Borderline — skipping is risky`
                                             }
                                         </p>
                                     </div>

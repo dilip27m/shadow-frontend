@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/app/components/Navbar';
+import NotificationSetup from '@/app/components/NotificationSetup';
 import api from '@/utils/api';
 import Calendar from '@/app/components/Calendar';
 import useSWR from 'swr';
@@ -11,6 +12,7 @@ export default function StudentAttention() {
     const { classId, rollNumber } = params;
     const router = useRouter();
     const [filterSubject, setFilterSubject] = useState('all');
+    const [filterUrgency, setFilterUrgency] = useState('all'); // 'all' or 'urgent'
     const [selectedDate, setSelectedDate] = useState(null); // YYYY-MM-DD
     const fetcher = (url) => api.get(url).then((res) => res.data);
     const reportKey = classId && rollNumber ? `/student/report/${classId}/${rollNumber}` : null;
@@ -127,6 +129,17 @@ export default function StudentAttention() {
         });
     }
 
+    // Urgent Filter: due within 2 days (overdue, today, tomorrow, 2 days left)
+    if (filterUrgency === 'urgent') {
+        filtered = filtered.filter(a => {
+            if (!a.dueDate) return false;
+            const now = new Date();
+            const due = new Date(a.dueDate);
+            const diffDays = Math.ceil((due - now) / 86400000);
+            return diffDays <= 2; // overdue (<0), today (0), tomorrow (1), 2 days left (2)
+        });
+    }
+
     // Subject Filter
     if (filterSubject !== 'all') {
         filtered = filtered.filter(a => a.subjectName === filterSubject || (filterSubject === 'General' && (!a.subjectId || a.subjectName === 'General')));
@@ -212,8 +225,13 @@ export default function StudentAttention() {
 
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold mb-1">Attention Board</h1>
-                    <p className="text-[var(--text-dim)] text-sm">{className} - Roll No. {rollNumber}</p>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-bold mb-1">Attention Board</h1>
+                            <p className="text-[var(--text-dim)] text-sm">{className} - Roll No. {rollNumber}</p>
+                        </div>
+                        <NotificationSetup classId={classId} rollNumber={rollNumber} />
+                    </div>
                 </div>
 
                 {/* Task Calendar */}
@@ -251,6 +269,15 @@ export default function StudentAttention() {
                 {filterOptions.length > 0 && (
                     <div className="mb-6">
                         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                            <button
+                                onClick={() => setFilterUrgency(filterUrgency === 'urgent' ? 'all' : 'urgent')}
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${filterUrgency === 'urgent'
+                                    ? 'bg-red-900/20 text-red-400 border border-red-500/30'
+                                    : 'bg-[var(--card-bg)] text-[var(--text-dim)] border border-[var(--border)] hover:border-white/30'
+                                    }`}
+                            >
+                                🔴 Urgent
+                            </button>
                             <button
                                 onClick={() => setFilterSubject('all')}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${filterSubject === 'all'

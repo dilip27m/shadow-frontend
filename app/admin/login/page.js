@@ -25,7 +25,7 @@ export default function AdminLogin() {
                     // Token is valid — renew it silently and redirect
                     localStorage.setItem('token', res.data.token);
                     localStorage.setItem('adminClassId', res.data.classId);
-                    router.push('/admin/dashboard');
+                    router.push('/admin/attention');
                 })
                 .catch(() => {
                     // Token expired or invalid — clear and show login
@@ -46,7 +46,7 @@ export default function AdminLogin() {
             const res = await api.post('/class/admin-login', { className, adminPin });
             localStorage.setItem('adminClassId', res.data.classId);
             localStorage.setItem('token', res.data.token);
-            router.push('/admin/dashboard');
+            router.push('/admin/attention');
         } catch (err) {
             if (err.response?.status === 401) {
                 notify({ message: 'Invalid PIN!', type: 'error' });

@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
+import { useConfirm } from '@/app/components/ConfirmDialog';
 import { useNotification } from '@/app/components/Notification';
 import useSWR, { mutate } from 'swr';
 
@@ -12,13 +13,13 @@ export default function StudentDashboard() {
   const { classId, rollNumber } = params;
   const router = useRouter();
   const notify = useNotification();
+  const confirm = useConfirm();
 
   const [minPercentage, setMinPercentage] = useState(75);
 
   const fetcher = url => api.get(url).then(res => res.data);
   const reportKey = classId && rollNumber ? `/student/report/${classId}/${rollNumber}` : null;
   const reportsKey = classId && rollNumber ? `/reports/${classId}/${rollNumber}` : null;
-  const announcementsKey = classId ? `/announcements/${classId}` : null;
   const reportCacheKey = classId && rollNumber ? `cls_config_${classId}_${rollNumber}` : null;
   const subjectCacheKey = classId ? `cls_subjects_${classId}` : null;
 
@@ -63,22 +64,6 @@ export default function StudentDashboard() {
     fetcher,
     swrConfig
   );
-
-  const { data: announcementsResponse } = useSWR(
-    announcementsKey,
-    fetcher,
-    swrConfig
-  );
-
-  const allAnnouncements = announcementsResponse?.announcements || [];
-
-  const now = new Date();
-  const announcementCount = allAnnouncements.filter(a => {
-    if (!a.dueDate) return false;
-    const due = new Date(a.dueDate);
-    const diff = due - now;
-    return diff > 0 && diff < 86400000;
-  }).length;
 
   const loading = reportLoading && !data;
 
@@ -146,7 +131,7 @@ export default function StudentDashboard() {
 
     if (percentage >= minPercentage + 5) {
       const canBunk = Math.floor((attended / (minPercentage / 100)) - total);
-      return { text: `Safe! You can bunk ${Math.max(0, canBunk)} more`, type: 'safe' };
+      return { text: `Safe! You can skip ${Math.max(0, canBunk)} more`, type: 'safe' };
     } else if (percentage < minPercentage) {
       const mustAttend = Math.ceil(((minPercentage / 100) * total - attended) / (1 - (minPercentage / 100)));
       return { text: `Attend next ${Math.max(1, mustAttend)} to recover`, type: 'danger' };
@@ -155,18 +140,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const getDeadlineStatus = (dueDate) => {
-    if (!dueDate) return null;
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffTime = due - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffTime < 0) return { text: `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`, type: 'danger', days: diffDays };
-    if (diffDays === 0) return { text: 'Due Today', type: 'urgent', days: 0 };
-    if (diffDays === 1) return { text: 'Due Tomorrow', type: 'warning', days: 1 };
-    return { text: `${diffDays} days left`, type: 'safe', days: diffDays };
-  };
 
   // Fetching is now handled by SWR and localStorage caching above
 
@@ -245,7 +219,8 @@ export default function StudentDashboard() {
   };
 
   const handleDeleteReport = async (reportId) => {
-    if (!confirm('Are you sure you want to delete this report?')) return;
+    const ok = await confirm('Delete Report?', 'Are you sure you want to delete this report?', { confirmText: 'Delete', type: 'danger' });
+    if (!ok) return;
     try {
       await api.delete(`/reports/delete/${reportId}`);
       notify({ message: "Report deleted successfully", type: 'success' });
@@ -255,14 +230,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // Get urgent deadlines (Due within 24h)
-  const urgentTasks = allAnnouncements.filter(a => {
-    if (!a.dueDate) return false;
-    const due = new Date(a.dueDate);
-    const now = new Date();
-    const diff = due - now;
-    return diff > 0 && diff < 86400000; // Positive and less than 24h
-  });
+
 
   // Get subject specific works
   const subjectWorks = selectedSubjectId
@@ -306,39 +274,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Urgent Deadlines (Due in 24h) */}
-        {urgentTasks.length > 0 && (
-          <div className="card mb-6 bg-gradient-to-br from-red-900/10 to-transparent border-red-500/30">
-            <h2 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              Urgent Tasks (Due in 24h)
-            </h2>
-
-            <div className="space-y-3">
-              {urgentTasks.map(task => {
-                const status = getDeadlineStatus(task.dueDate);
-                return (
-                  <div key={task._id} className="p-3 rounded bg-[var(--bg)] border border-[var(--border)] relative overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
-                    <div className="flex justify-between items-start mb-1 pl-2">
-                      <span className="font-semibold text-sm">{task.title}</span>
-                      <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                        {status?.text}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-dim)] line-clamp-2 pl-2">{task.description}</p>
-                    <p className="text-[10px] text-[var(--text-dim)] mt-2 pl-2">
-                      {task.subjectName || 'General'}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Minimum Attendance Slider */}
         <div className="card mb-6">
@@ -440,7 +375,7 @@ export default function StudentDashboard() {
               className="card text-center py-4 hover:border-purple-500/50 transition group"
             >
               <p className="text-2xl mb-2">🧮</p>
-              <p className="text-xs text-[var(--text-dim)] group-hover:text-purple-400 transition">Bunk Effect</p>
+              <p className="text-xs text-[var(--text-dim)] group-hover:text-purple-400 transition">Skip Effect</p>
             </Link>
             <Link
               href={`/student/${classId}/${rollNumber}/attention`}
@@ -448,11 +383,6 @@ export default function StudentDashboard() {
             >
               <p className="text-2xl mb-2">📢</p>
               <p className="text-xs text-[var(--text-dim)] group-hover:text-orange-400 transition">Attention</p>
-              {announcementCount > 0 && (
-                <span className="absolute top-2 right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full px-1">
-                  {announcementCount}
-                </span>
-              )}
             </Link>
           </div>
         </div>
