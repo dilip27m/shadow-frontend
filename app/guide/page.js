@@ -256,7 +256,7 @@ export default function GuidePage() {
                             Meet <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent" style={{ backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite' }}>Shadow</span>
                         </h1>
                         <p className="text-lg text-[var(--text-dim)] max-w-lg mx-auto mb-2">
-                            The attendance tracker that actually makes you want to check your attendance.
+                            Attendance is temporary, but your CGPA is Mandatory.
                         </p>
                         <p className="text-sm text-[var(--text-dim)] opacity-60">
                             (Okay maybe &quot;want&quot; is a strong word. But at least it&apos;s painless.)
@@ -478,7 +478,7 @@ export default function GuidePage() {
                             Built with 💀 by students who were too lazy to calculate attendance.
                         </p>
                         <p className="text-[10px] text-[var(--text-dim)] opacity-40 mt-2">
-                            Shadow v2.0 — &quot;Attendance is temporary, but your CGPA is forever.&quot;
+                            Shadow v2.0 — &quot;Attendance is temporary, but your CGPA is Mandatory.&quot;
                         </p>
                     </div>
                 </footer>
