@@ -259,7 +259,7 @@ export default function GuidePage() {
                             Attendance is temporary, but your CGPA is Mandatory.
                         </p>
                         <p className="text-sm text-[var(--text-dim)] opacity-60">
-                            (Okay maybe &quot;want&quot; is a strong word. But at least it&apos;s painless.)
+                            But Minimum attendance is necessary to get the CGPA
                         </p>
 
                         <div className="flex justify-center gap-3 mt-8">
@@ -342,7 +342,7 @@ export default function GuidePage() {
                     <RevealSection>
                         <h2 className="text-2xl font-black text-center mb-2 tracking-tight">Features That Slap</h2>
                         <p className="text-sm text-[var(--text-dim)] text-center mb-10">
-                            No cap. These features go hard. 
+                            No cap. These features go hard.
                         </p>
                     </RevealSection>
 
