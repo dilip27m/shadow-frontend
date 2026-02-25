@@ -125,7 +125,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
     const Drawer = ({ children }) => (
         <>
             {drawerOpen && (
-                <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+                <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm animate-fade-in"
                     onClick={() => setDrawerOpen(false)} />
             )}
             <div className="fixed top-0 right-0 bottom-0 z-[70] w-72 flex flex-col border-l border-white/8"
@@ -133,8 +133,9 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     background: 'rgba(10,10,12,0.97)',
                     backdropFilter: 'blur(24px)',
                     transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
-                    transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                     willChange: 'transform',
+                    pointerEvents: drawerOpen ? 'auto' : 'none',
                 }}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/6">
                     <span className="text-xs font-bold text-white/40 tracking-widest uppercase">Menu</span>
