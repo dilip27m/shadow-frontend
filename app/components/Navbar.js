@@ -232,9 +232,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                 </BottomBar>
 
                 <Drawer>
-                    <DrawerLink href={attendancePath} icon={LayoutDashboard} label="Attendance" />
-                    <DrawerLink href={attentionPath} icon={Megaphone} label="Attention" />
-                    <DrawerLink href={calcPath} icon={Calculator} label="CGPA Calculator" />
                     <DrawerLink href={`/student/${classId}/${rollNumber}/calendar`} icon={Calendar} label="Calendar" />
                     <DrawerLink href={`/student/${classId}/${rollNumber}/bunk-effect`} icon={Zap} label="Skip Effect" />
                     {onReportClick && <DrawerButton onClick={onReportClick} icon={Flag} label="Report Issue" />}
