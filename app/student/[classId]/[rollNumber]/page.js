@@ -315,7 +315,11 @@ export default function StudentDashboard() {
           })()}
         </div>
 
-
+        {/* --- Report Info --- */}
+        <div className="mt-5 flex items-start gap-2 text-xs text-[var(--text-dim)] px-2">
+          <div className="w-4 h-4 rounded-full border border-[var(--text-dim)] flex flex-shrink-0 items-center justify-center font-bold text-[9px] opacity-70 mt-0.5">?</div>
+          <p className="opacity-80">To report incorrect attendance, tap on a subject and click the <strong>Dispute</strong> button next to the absent date.</p>
+        </div>
 
         {/* --- History & Works Modal --- */}
         {historyModal && (

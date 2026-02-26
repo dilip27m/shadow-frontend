@@ -115,53 +115,54 @@ export default function Calendar({
             {/* ── Collapsible body ── */}
             <div
                 style={{
-                    maxHeight: expanded ? '420px' : '0px',
-                    overflow: 'hidden',
-                    transition: 'max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                    display: 'grid',
+                    gridTemplateRows: expanded ? '1fr' : '0fr',
+                    transition: 'grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
             >
-                <div className="px-3 pb-4 border-t border-white/6">
-                    {/* Day headers */}
-                    <div className="grid grid-cols-7 gap-1 mt-3 mb-1">
-                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                            <div key={i} className="text-center text-[10px] font-semibold text-white/30 py-1.5 uppercase tracking-wider">
-                                {d}
-                            </div>
-                        ))}
-                    </div>
+                <div style={{ overflow: 'hidden' }}>
+                    <div className="px-3 pb-4 border-t border-white/6">
+                        {/* Day headers */}
+                        <div className="grid grid-cols-7 gap-1 mt-3 mb-1">
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                                <div key={i} className="text-center text-[10px] font-semibold text-white/30 py-1.5 uppercase tracking-wider">
+                                    {d}
+                                </div>
+                            ))}
+                        </div>
 
-                    {/* Day grid */}
-                    <div className="grid grid-cols-7 gap-1">
-                        {[...Array(firstDayOfMonth)].map((_, i) => (
-                            <div key={`e-${i}`} className="aspect-square" />
-                        ))}
+                        {/* Day grid */}
+                        <div className="grid grid-cols-7 gap-1">
+                            {[...Array(firstDayOfMonth)].map((_, i) => (
+                                <div key={`e-${i}`} className="aspect-square" />
+                            ))}
 
-                        {[...Array(daysInMonth)].map((_, i) => {
-                            const day = i + 1;
-                            const dateStr = formatDate(day);
-                            let isDisabled = false;
-                            if (!enableAllDates) {
-                                isDisabled = allowFuture ? (dateStr < today) : (dateStr > today);
-                            }
+                            {[...Array(daysInMonth)].map((_, i) => {
+                                const day = i + 1;
+                                const dateStr = formatDate(day);
+                                let isDisabled = false;
+                                if (!enableAllDates) {
+                                    isDisabled = allowFuture ? (dateStr < today) : (dateStr > today);
+                                }
 
-                            const hasData = attendanceDates.includes(dateStr);
-                            const hasTask = taskDates.includes(dateStr);
-                            const isSelectedDate = isSelected(day);
-                            const todayDate = isToday(day);
+                                const hasData = attendanceDates.includes(dateStr);
+                                const hasTask = taskDates.includes(dateStr);
+                                const isSelectedDate = isSelected(day);
+                                const todayDate = isToday(day);
 
-                            return (
-                                <button
-                                    key={day}
-                                    onClick={() => !isDisabled && onSelectDate(dateStr)}
-                                    disabled={isDisabled}
-                                    className={`
+                                return (
+                                    <button
+                                        key={day}
+                                        onClick={() => !isDisabled && onSelectDate(dateStr)}
+                                        disabled={isDisabled}
+                                        className={`
                                         relative aspect-square rounded-xl flex flex-col items-center justify-center
                                         text-xs font-semibold transition-all duration-150 select-none
                                         ${isSelectedDate
-                                            ? multiSelect
-                                                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                                                : 'bg-blue-500 text-white shadow-lg shadow-blue-500/25 scale-105'
-                                            : ''}
+                                                ? multiSelect
+                                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                                                    : 'bg-blue-500 text-white shadow-lg shadow-blue-500/25 scale-105'
+                                                : ''}
                                         ${todayDate && !isSelectedDate ? 'ring-2 ring-blue-400/60 text-blue-300' : ''}
                                         ${hasData && !isSelectedDate && !isDisabled ? 'text-emerald-400' : ''}
                                         ${hasTask && !isSelectedDate && !isDisabled ? 'text-purple-400' : ''}
@@ -169,26 +170,27 @@ export default function Calendar({
                                         ${!isDisabled && !isSelectedDate ? 'hover:bg-white/8 cursor-pointer' : ''}
                                         ${!isSelectedDate && !hasData && !hasTask && !isDisabled && !todayDate ? 'text-white/70' : ''}
                                     `}
-                                >
-                                    {day}
-                                    {/* Dots row */}
-                                    {(hasData || hasTask) && !isSelectedDate && (
-                                        <div className="absolute bottom-1 flex gap-0.5">
-                                            {hasData && <span className="w-1 h-1 rounded-full bg-emerald-400" />}
-                                            {hasTask && <span className="w-1 h-1 rounded-full bg-purple-400" />}
-                                        </div>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                    >
+                                        {day}
+                                        {/* Dots row */}
+                                        {(hasData || hasTask) && !isSelectedDate && (
+                                            <div className="absolute bottom-1 flex gap-0.5">
+                                                {hasData && <span className="w-1 h-1 rounded-full bg-emerald-400" />}
+                                                {hasTask && <span className="w-1 h-1 rounded-full bg-purple-400" />}
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
-                    {/* Legend */}
-                    <div className="flex items-center gap-4 mt-4 pt-3 border-t border-white/6 text-[10px] text-white/30">
-                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Attendance</span>
-                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />Task due</span>
-                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded ring-2 ring-blue-400/60 inline-block" />Today</span>
-                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />Selected</span>
+                        {/* Legend */}
+                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-white/6 text-[10px] text-white/30">
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Attendance</span>
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />Task due</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded ring-2 ring-blue-400/60 inline-block" />Today</span>
+                            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />Selected</span>
+                        </div>
                     </div>
                 </div>
             </div>
