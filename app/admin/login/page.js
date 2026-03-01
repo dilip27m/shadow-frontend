@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Shield, ArrowLeft, Loader2, Eye, EyeOff, Mail } from 'lucide-react';
 import Navbar from '@/app/components/Navbar';
 import api from '@/utils/api';
 import { useNotification } from '@/app/components/Notification';
@@ -9,26 +9,23 @@ import { useNotification } from '@/app/components/Notification';
 export default function AdminLogin() {
     const router = useRouter();
     const notify = useNotification();
-    const [className, setClassName] = useState('');
-    const [adminPin, setAdminPin] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [checkingSession, setCheckingSession] = useState(true);
-    const [showPin, setShowPin] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         const storedClassId = localStorage.getItem('adminClassId');
         const storedToken = localStorage.getItem('token');
         if (storedClassId && storedToken) {
-            // Verify token is still valid and renew it
             api.post('/class/verify-token')
                 .then(res => {
-                    // Token is valid — renew it silently and redirect
                     localStorage.setItem('token', res.data.token);
                     localStorage.setItem('adminClassId', res.data.classId);
                     router.push('/admin/attention');
                 })
                 .catch(() => {
-                    // Token expired or invalid — clear and show login
                     localStorage.removeItem('adminClassId');
                     localStorage.removeItem('token');
                     setCheckingSession(false);
@@ -43,18 +40,17 @@ export default function AdminLogin() {
         setLoading(true);
 
         try {
-            const res = await api.post('/class/admin-login', { className, adminPin });
-            localStorage.setItem('adminClassId', res.data.classId);
+            const res = await api.post('/auth/login', {
+                email: email.trim().toLowerCase(),
+                password
+            });
+
+            localStorage.setItem('adminClassId', res.data.user.classId);
             localStorage.setItem('token', res.data.token);
             router.push('/admin/attention');
         } catch (err) {
-            if (err.response?.status === 401) {
-                notify({ message: 'Invalid PIN!', type: 'error' });
-            } else if (err.response?.status === 404) {
-                notify({ message: 'Class not found!', type: 'error' });
-            } else {
-                notify({ message: 'Login failed!', type: 'error' });
-            }
+            const msg = err.response?.data?.error || 'Login failed!';
+            notify({ message: msg, type: 'error' });
             setLoading(false);
         }
     };
@@ -73,44 +69,47 @@ export default function AdminLogin() {
                         <Shield className="w-6 h-6 text-blue-400" />
                     </div>
                     <h1 className="text-2xl font-bold mb-2" style={{ letterSpacing: '-0.03em' }}>Admin Login</h1>
-                    <p className="text-[var(--text-dim)]">Enter your class credentials to continue</p>
+                    <p className="text-[var(--text-dim)]">Enter your admin email and password to continue</p>
                 </div>
 
                 {/* Form */}
                 <div className="glass-card animate-fade-up delay-100">
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div>
-                            <label className="block text-xs font-medium text-[var(--text-dim)] mb-2 uppercase tracking-wider">Class Name</label>
-                            <input
-                                id="admin-class-name"
-                                type="text"
-                                className="input"
-                                placeholder="e.g. S6 CSE-B"
-                                value={className}
-                                onChange={(e) => setClassName(e.target.value)}
-                                autoComplete="off"
-                                required
-                            />
+                            <label className="block text-xs font-medium text-[var(--text-dim)] mb-2 uppercase tracking-wider">Email</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-dim)]" />
+                                <input
+                                    id="admin-email"
+                                    type="email"
+                                    className="input pl-10"
+                                    placeholder="admin@college.edu"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    autoComplete="email"
+                                    required
+                                />
+                            </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-[var(--text-dim)] mb-2 uppercase tracking-wider">Admin PIN</label>
+                            <label className="block text-xs font-medium text-[var(--text-dim)] mb-2 uppercase tracking-wider">Password</label>
                             <div className="relative">
                                 <input
-                                    id="admin-pin"
-                                    type={showPin ? 'text' : 'password'}
+                                    id="admin-password"
+                                    type={showPassword ? 'text' : 'password'}
                                     className="input pr-12"
-                                    placeholder="••••"
-                                    value={adminPin}
-                                    onChange={(e) => setAdminPin(e.target.value)}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => setShowPin(!showPin)}
+                                    onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-white transition"
                                 >
-                                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
                         </div>

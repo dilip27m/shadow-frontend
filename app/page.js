@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import {
     Calendar, Shield,
     GraduationCap, School, ChevronRight,
-    ArrowRight
+    ArrowRight, KeyRound
 } from 'lucide-react';
 import Navbar from './components/Navbar';
 import api from '@/utils/api';
@@ -15,9 +15,12 @@ import { useNotification } from './components/Notification';
 export default function Home() {
     const router = useRouter();
     const notify = useNotification();
-    const [className, setClassName] = useState('');
     const [rollNumber, setRollNumber] = useState('');
+    const [classId, setClassId] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [classes, setClasses] = useState([]);
+    const [loadingClasses, setLoadingClasses] = useState(true);
 
     const [sessionChecked, setSessionChecked] = useState(false);
     const [activeTab, setActiveTab] = useState('student');
@@ -29,14 +32,12 @@ export default function Home() {
         const adminToken = localStorage.getItem('token');
         const studentClassId = localStorage.getItem('studentClassId');
         const studentRoll = localStorage.getItem('studentRoll');
-        const studentClassName = localStorage.getItem('studentClassName');
         const studentToken = localStorage.getItem('studentToken');
 
         // Auto-redirect: Admin with valid token
         if (adminClassId && adminToken) {
             api.post('/class/verify-token')
                 .then(res => {
-                    // Token is valid — renew and redirect
                     localStorage.setItem('token', res.data.token);
                     localStorage.setItem('adminClassId', res.data.classId);
                     router.push('/admin/attention');
@@ -46,60 +47,52 @@ export default function Home() {
                     localStorage.removeItem('token');
                     setSessionChecked(true);
                 });
-            return; // Don't check student — admin takes priority
-        }
-
-        // Auto-redirect: Returning student
-        if (studentClassId && studentRoll) {
-            const ensureToken = studentToken
-                ? Promise.resolve()
-                : (studentClassName
-                    ? api.post('/student/access', { className: studentClassName, rollNumber: studentRoll })
-                        .then((accessRes) => {
-                            localStorage.setItem('studentToken', accessRes.data.token);
-                        })
-                    : Promise.reject(new Error('Missing student session data')));
-
-            ensureToken
-                .then(() => api.get(`/class/${studentClassId}`))
-                .then(() => {
-                    // Class still exists — redirect to student dashboard
-                    router.push(`/student/${studentClassId}/${studentRoll}/attention`);
-                })
-                .catch(() => {
-                    localStorage.removeItem('studentClassId');
-                    localStorage.removeItem('studentRoll');
-                    localStorage.removeItem('studentClassName');
-                    localStorage.removeItem('studentToken');
-                    setSessionChecked(true);
-                });
             return;
         }
 
-        // No saved session — show landing page
+        // Auto-redirect: Returning student with valid token
+        if (studentClassId && studentRoll && studentToken) {
+            router.push(`/student/${studentClassId}/${studentRoll}/attention`);
+            return;
+        }
+
+        // Clear stale partial data
+        if (studentClassId || studentRoll) {
+            localStorage.removeItem('studentClassId');
+            localStorage.removeItem('studentRoll');
+            localStorage.removeItem('studentClassName');
+            localStorage.removeItem('studentToken');
+        }
+
         setSessionChecked(true);
+    }, []);
 
-
+    // Fetch approved classes
+    useEffect(() => {
+        api.get('/class/public/list')
+            .then(res => setClasses(res.data.classes || []))
+            .catch(() => { })
+            .finally(() => setLoadingClasses(false));
     }, []);
 
     const handleStudentLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await api.post('/student/access', {
-                className: className.trim(),
-                rollNumber: String(rollNumber).trim()
+            const res = await api.post('/auth/login', {
+                rollNumber: rollNumber.trim(),
+                classId,
+                password
             });
 
-            const classId = res.data.classId;
-            const normalizedRollNumber = res.data.rollNumber;
-            localStorage.setItem('studentClassId', classId);
-            localStorage.setItem('studentRoll', normalizedRollNumber);
-            localStorage.setItem('studentClassName', res.data.className || className.trim());
             localStorage.setItem('studentToken', res.data.token);
-            router.push(`/student/${classId}/${normalizedRollNumber}/attention`);
+            localStorage.setItem('token', res.data.token);
+            localStorage.setItem('studentClassId', res.data.user.classId);
+            localStorage.setItem('studentRoll', res.data.user.rollNumber);
+            router.push(`/student/${res.data.user.classId}/${res.data.user.rollNumber}/attention`);
         } catch (err) {
-            notify({ message: err.response?.data?.error || "Class or roll number not found.", type: 'error' });
+            const msg = err.response?.data?.error || 'Login failed. Check your credentials.';
+            notify({ message: msg, type: 'error' });
             setLoading(false);
         }
     };
@@ -119,15 +112,10 @@ export default function Home() {
                 {/* Gradient orbs */}
                 <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none"></div>
                 <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] bg-yellow-500/4 rounded-full blur-[120px] pointer-events-none"></div>
-                {/* Centered yellow glow behind headline */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-yellow-400/6 rounded-full blur-[150px] pointer-events-none"></div>
 
                 <div className="max-w-5xl mx-auto px-4 pt-16 pb-12 relative">
                     <div className="text-center">
-                        {/* Badge */}
-
-
-                        {/* Headline */}
                         <h1 className="animate-fade-up delay-100 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]"
                             style={{ letterSpacing: '-0.04em' }}>
                             <span className="bg-gradient-to-b from-white via-white to-gray-400 bg-clip-text text-transparent">
@@ -141,11 +129,6 @@ export default function Home() {
                                 </span>
                             </span>
                         </h1>
-
-                        {/* Subhead */}
-
-
-
                     </div>
                 </div>
             </section>
@@ -180,26 +163,56 @@ export default function Home() {
                         <form onSubmit={handleStudentLogin} className="glass-card">
                             <div className="flex items-center gap-2 mb-5">
                                 <GraduationCap className="w-5 h-5 text-emerald-400" />
-                                <h2 className="text-sm font-semibold uppercase tracking-wider">Student Access</h2>
+                                <h2 className="text-sm font-semibold uppercase tracking-wider">Student Login</h2>
                             </div>
 
-                            <input
-                                id="student-class-name"
-                                type="text"
-                                className="input mb-3"
-                                placeholder="Class Name"
-                                value={className}
-                                onChange={(e) => setClassName(e.target.value)}
-                                required
-                            />
+                            {/* Class Selection */}
+                            {loadingClasses ? (
+                                <div className="input mb-3 flex items-center text-[var(--text-dim)]">Loading classes...</div>
+                            ) : classes.length > 0 ? (
+                                <select
+                                    id="student-class"
+                                    className="input mb-3"
+                                    value={classId}
+                                    onChange={(e) => setClassId(e.target.value)}
+                                    required
+                                >
+                                    <option value="">Select your class</option>
+                                    {classes.map(cls => (
+                                        <option key={cls._id} value={cls._id}>
+                                            {cls.className}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    id="student-class-id"
+                                    type="text"
+                                    className="input mb-3"
+                                    placeholder="Class ID"
+                                    value={classId}
+                                    onChange={(e) => setClassId(e.target.value)}
+                                    required
+                                />
+                            )}
 
                             <input
                                 id="student-roll-number"
                                 type="text"
-                                className="input mb-5"
+                                className="input mb-3"
                                 placeholder="Roll Number"
                                 value={rollNumber}
                                 onChange={(e) => setRollNumber(e.target.value)}
+                                required
+                            />
+
+                            <input
+                                id="student-password"
+                                type="password"
+                                className="input mb-5"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
 
@@ -207,15 +220,27 @@ export default function Home() {
                                 {loading ? (
                                     <span className="flex items-center gap-2">
                                         <span className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></span>
-                                        Loading...
+                                        Logging in...
                                     </span>
                                 ) : (
                                     <span className="flex items-center gap-2">
-                                        View My Attendance
+                                        Login
                                         <ArrowRight className="w-4 h-4" />
                                     </span>
                                 )}
                             </button>
+
+                            {/* Claim link */}
+                            <div className="mt-4 text-center">
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/claim')}
+                                    className="inline-flex items-center gap-2 text-sm text-amber-400/80 hover:text-amber-300 transition"
+                                >
+                                    <KeyRound className="w-3.5 h-3.5" />
+                                    Have a secret key? Claim your account
+                                </button>
+                            </div>
                         </form>
                     </div>
                 )}
@@ -237,7 +262,7 @@ export default function Home() {
                                 >
                                     <div className="text-left">
                                         <p className="text-sm font-semibold">Login to Existing Class</p>
-                                        <p className="text-xs text-[var(--text-dim)]">Use your class name & admin PIN</p>
+                                        <p className="text-xs text-[var(--text-dim)]">Use your admin email & password</p>
                                     </div>
                                     <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-1 transition-transform" />
                                 </button>
