@@ -92,6 +92,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                                 <NavLink href="/admin/attention" icon={AlertTriangle} label="Attention" />
                                 <NavLink href="/admin/subjects" icon={BookOpen} label="Subjects" />
                                 <NavLink href="/admin/dashboard" icon={LayoutDashboard} label="Attendance" />
+                                <NavLink href="/admin/dutyleave" icon={Zap} label="Duty Leave" />
 
                                 {navClassId && (
                                     <NavLink href={`/admin/reports/${navClassId}`} icon={FileText} label="Reports" />
