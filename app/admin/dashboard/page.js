@@ -108,25 +108,6 @@ export default function AdminDashboard() {
     // Load attendance for selected date
     const loadAttendanceForDate = useCallback(async (date, cId) => {
         try {
-            // Check for locally unsaved drafts first!
-            const draftKey = `shadow_draft_${cId}_${date}`;
-            const draftJson = localStorage.getItem(draftKey);
-            if (draftJson) {
-                try {
-                    const draft = JSON.parse(draftJson);
-                    setPeriods(draft.periods || []);
-                    setAbsentees(draft.absentees || {});
-                    setAbsentInputs(draft.absentInputs || {});
-                    setHasModifications(true);
-                    setIsDateLocked(false);
-                    setAutoRelockArmed(true);
-                    setLastModified(null);
-                    notify({ message: 'Loaded unsaved changes from device', type: 'success' });
-                    return; // DO NOT load from server, use the draft!
-                } catch (e) {
-                    localStorage.removeItem(draftKey);
-                }
-            }
 
             const res = await api.get(`/attendance/by-date/${cId}/${date}`);
             if (res.data && res.data.periods && res.data.periods.length > 0) {
@@ -235,13 +216,7 @@ export default function AdminDashboard() {
         }
     }, [selectedDate, classId, subjects, loadAttendanceForDate]);
 
-    // Auto-save drafts to prevent data loss
-    useEffect(() => {
-        if (hasModifications && classId && selectedDate) {
-            const draft = { periods, absentees, absentInputs };
-            localStorage.setItem(`shadow_draft_${classId}_${selectedDate}`, JSON.stringify(draft));
-        }
-    }, [hasModifications, periods, absentees, absentInputs, classId, selectedDate]);
+
 
     const clearAutoRelockTimer = useCallback(() => {
         if (autoRelockTimerRef.current) {
@@ -676,7 +651,7 @@ export default function AdminDashboard() {
                 date: selectedDate,
                 periods: formattedPeriods
             });
-            localStorage.removeItem(`shadow_draft_${classId}_${selectedDate}`);
+
             notify({ message: "Attendance Saved Successfully ✓", type: 'success' });
             setHasModifications(false);
             setIsDateLocked(true);
