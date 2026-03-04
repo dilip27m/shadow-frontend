@@ -126,6 +126,10 @@ export default function SuperAdminPage() {
     const [loadingClasses, setLoadingClasses] = useState(false);
     const [fetchError, setFetchError] = useState('');
 
+    const [expandedClassId, setExpandedClassId] = useState(null);
+    const [detailsCache, setDetailsCache] = useState({});
+    const [loadingDetails, setLoadingDetails] = useState('');
+
     const [purgeTarget, setPurgeTarget] = useState(null); // { classId, className }
     const [purging, setPurging] = useState(false);
 
@@ -179,6 +183,32 @@ export default function SuperAdminPage() {
         }
     };
 
+    // ── Toggle Class Details Row ───────────────────────────────────────────────
+    const toggleRow = async (classId) => {
+        if (expandedClassId === classId) {
+            setExpandedClassId(null);
+            return;
+        }
+        setExpandedClassId(classId);
+
+        if (!detailsCache[classId]) {
+            setLoadingDetails(classId);
+            try {
+                const res = await fetch(`${API_BASE}/class/super-admin/class-details/${classId}`, {
+                    headers: { 'X-Super-Admin-Key': masterKey },
+                });
+                if (!res.ok) throw new Error('Failed to load metrics');
+                const data = await res.json();
+                setDetailsCache(prev => ({ ...prev, [classId]: data }));
+            } catch (err) {
+                setToast({ type: 'error', message: err.message });
+                setExpandedClassId(null);
+            } finally {
+                setLoadingDetails('');
+            }
+        }
+    };
+
     // ── Purge handler ──────────────────────────────────────────────────────────
     const handlePurge = async () => {
         if (!purgeTarget) return;
@@ -213,6 +243,8 @@ export default function SuperAdminPage() {
         setClasses([]);
         setFetchError('');
         setPurgeTarget(null);
+        setExpandedClassId(null);
+        setDetailsCache({});
     };
 
     // ───────────────────────────────────────────────────────────────────────────
@@ -394,49 +426,107 @@ export default function SuperAdminPage() {
                         </div>
 
                         {/* Rows */}
-                        <div className="divide-y divide-white/5">
-                            {classes.map((cls, i) => (
-                                <div
-                                    key={cls._id}
-                                    className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-white/[0.02] transition group"
-                                >
-                                    {/* Name */}
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400">
-                                            {i + 1}
+                        <div className="flex flex-col">
+                            {classes.map((cls, i) => {
+                                const isExpanded = expandedClassId === cls._id;
+                                const details = detailsCache[cls._id];
+                                const isLoading = loadingDetails === cls._id;
+
+                                return (
+                                    <div key={cls._id} className="flex flex-col border-b border-white/5 last:border-0 group">
+                                        <div
+                                            onClick={() => toggleRow(cls._id)}
+                                            className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-white/[0.04] transition cursor-pointer"
+                                        >
+                                            {/* Name */}
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400">
+                                                    {i + 1}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-white truncate">{cls.className}</p>
+                                                    <p className="text-xs text-gray-600 mt-0.5">
+                                                        {cls.createdAt
+                                                            ? new Date(cls.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                                            : '—'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* ID */}
+                                            <span className="hidden sm:block font-mono text-xs text-gray-500 text-right" title={cls._id}>
+                                                {cls._id.slice(-8)}
+                                            </span>
+
+                                            {/* Students */}
+                                            <span className="hidden sm:flex items-center justify-end gap-1 text-xs text-gray-400">
+                                                <Users className="w-3 h-3 text-gray-600" />
+                                                {cls.rollNumbers?.length ?? '—'}
+                                            </span>
+
+                                            {/* Purge button */}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setPurgeTarget({ classId: cls._id, className: cls.className }); }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 text-xs font-medium transition active:scale-95"
+                                                title="Purge this class"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <span className="hidden sm:block">Purge</span>
+                                            </button>
                                         </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-semibold text-white truncate">{cls.className}</p>
-                                            <p className="text-xs text-gray-600 mt-0.5">
-                                                {cls.createdAt
-                                                    ? new Date(cls.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                                                    : '—'}
-                                            </p>
-                                        </div>
+
+                                        {/* Expanded Details Area */}
+                                        {isExpanded && (
+                                            <div className="bg-black/40 border-t border-white/5 p-5 animate-slide-up">
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center py-8 text-gray-500 gap-2 text-sm">
+                                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                                        Loading metrics...
+                                                    </div>
+                                                ) : details ? (
+                                                    <div className="space-y-6">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                <p className="text-xs text-gray-400 mb-1">Total Attendance</p>
+                                                                <p className="text-lg font-semibold text-white">{details.attendancesCount}</p>
+                                                            </div>
+                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                <p className="text-xs text-gray-400 mb-1">Reports</p>
+                                                                <p className="text-lg font-semibold text-white">{details.reportsCount}</p>
+                                                            </div>
+                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                <p className="text-xs text-gray-400 mb-1">Announcements</p>
+                                                                <p className="text-lg font-semibold text-white">{details.announcementsCount}</p>
+                                                            </div>
+                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                <p className="text-xs text-gray-400 mb-1">Push Subs</p>
+                                                                <p className="text-lg font-semibold text-white">{details.pushSubscriptionsCount}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                                <Shield className="w-3.5 h-3.5" /> Blocked Roll Numbers ({details.blockedRollNumbers.length})
+                                                            </h3>
+                                                            {details.blockedRollNumbers.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {details.blockedRollNumbers.map(roll => (
+                                                                        <span key={roll} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-mono">{roll}</span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-gray-500">No students are currently blocked.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-4 text-center text-red-400 text-sm">Failed to load details</div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {/* ID */}
-                                    <span className="hidden sm:block font-mono text-xs text-gray-500 text-right" title={cls._id}>
-                                        {cls._id.slice(-8)}
-                                    </span>
-
-                                    {/* Students */}
-                                    <span className="hidden sm:flex items-center justify-end gap-1 text-xs text-gray-400">
-                                        <Users className="w-3 h-3 text-gray-600" />
-                                        {cls.rollNumbers?.length ?? '—'}
-                                    </span>
-
-                                    {/* Purge button */}
-                                    <button
-                                        onClick={() => setPurgeTarget({ classId: cls._id, className: cls.className })}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 text-xs font-medium transition active:scale-95"
-                                        title="Purge this class"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:block">Purge</span>
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
