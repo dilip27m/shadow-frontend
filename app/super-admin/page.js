@@ -461,7 +461,7 @@ export default function SuperAdminPage() {
                                             {/* Students */}
                                             <span className="hidden sm:flex items-center justify-end gap-1 text-xs text-gray-400">
                                                 <Users className="w-3 h-3 text-gray-600" />
-                                                {cls.rollNumbers?.length ?? '—'}
+                                                {(cls.rollNumbers?.length > 0 ? cls.rollNumbers.length : cls.totalStudents) ?? '—'}
                                             </span>
 
                                             {/* Purge button */}
