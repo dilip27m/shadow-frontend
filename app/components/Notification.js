@@ -55,14 +55,14 @@ export default function NotificationProvider({ children }) {
             {children}
             {notification && (
                 <div
-                    className="fixed top-5 left-1/2 z-50 w-[calc(100vw-2rem)] sm:w-auto flex justify-center"
-                    style={{ transform: 'translateX(-50%)', animation: 'slideDown 0.3s cubic-bezier(0.34,1.56,0.64,1) both' }}
+                    className="fixed top-5 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-sm"
+                    style={{ animation: 'notifySlideDown 0.3s cubic-bezier(0.34,1.56,0.64,1) both' }}
                 >
                     <div
                         className={`
                             flex items-start gap-3 pl-4 pr-3 py-3 rounded-2xl shadow-2xl
                             border border-white/10 border-l-2 ${c.accent}
-                            w-full sm:min-w-[280px] sm:max-w-sm
+                            w-full
                         `}
                         style={{
                             background: 'rgba(18, 18, 22, 0.88)',
@@ -96,9 +96,9 @@ export default function NotificationProvider({ children }) {
             )}
 
             <style>{`
-                @keyframes slideDown {
-                    from { opacity: 0; transform: translateY(-16px) scale(0.96); }
-                    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+                @keyframes notifySlideDown {
+                    from { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(0.96); }
+                    to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1);    }
                 }
             `}</style>
         </NotificationContext.Provider>
