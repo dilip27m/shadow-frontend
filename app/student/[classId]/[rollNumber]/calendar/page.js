@@ -77,9 +77,14 @@ export default function StudentCalendar() {
     const { data: dayAttendanceData, isLoading: dayLoading } = useSWR(dayAttendanceKey, fetcher, swrConfig);
 
     const className = reportData?.className || '';
-    const attendanceDates = (attendanceDatesResponse?.dates || []).map(d => new Date(d).toISOString().split('T')[0]);
+    // Fix: extract date part directly to avoid UTC→local day shift (e.g. Feb 25 UTC midnight → Feb 24 IST)
+    const attendanceDates = (attendanceDatesResponse?.dates || []).map((dateStr) =>
+        String(dateStr).split('T')[0]
+    );
     const dayAttendance = dayAttendanceData || null;
-    const loading = (reportLoading && !reportData) || (datesLoading && !attendanceDatesResponse) || (dayLoading && !dayAttendanceData);
+    // Fix: exclude dayLoading from the main gate — including it causes the page to fully
+    // remount each time a date is selected, which resets selectedDate back to today.
+    const loading = (reportLoading && !reportData) || (datesLoading && !attendanceDatesResponse);
 
     const handleLogout = () => {
         localStorage.removeItem('studentClassId');
@@ -109,7 +114,8 @@ export default function StudentCalendar() {
         <>
             <Navbar isStudent={true} onLogout={handleLogout} classId={classId} rollNumber={rollNumber} />
 
-            <div className="max-w-2xl mx-auto px-4 py-8">
+            <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
+
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold">Calendar</h1>
                     <p className="text-[var(--text-dim)]">{className} - Roll No. {rollNumber}</p>
@@ -129,7 +135,9 @@ export default function StudentCalendar() {
                             Attendance for {formatDateDisplay(selectedDate)}
                         </h2>
 
-                        {!dayAttendance || !dayAttendance.periods || dayAttendance.periods.length === 0 ? (
+                        {dayLoading ? (
+                            <p className="text-center text-[var(--text-dim)] py-8 animate-pulse">Loading...</p>
+                        ) : !dayAttendance || !dayAttendance.periods || dayAttendance.periods.length === 0 ? (
                             <p className="text-center text-[var(--text-dim)] py-8">No classes on this day</p>
                         ) : (
                             <div className="space-y-3">

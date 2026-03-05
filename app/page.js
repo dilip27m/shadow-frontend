@@ -187,7 +187,7 @@ export default function Home() {
                                 id="student-class-name"
                                 type="text"
                                 className="input mb-3"
-                                placeholder="Class Name (e.g. S6 CSE-B)"
+                                placeholder="Class Name"
                                 value={className}
                                 onChange={(e) => setClassName(e.target.value)}
                                 required

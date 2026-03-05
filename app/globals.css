@@ -36,7 +36,14 @@ html {
   padding: 1.5rem;
   border-radius: 1rem;
   margin-bottom: 1rem;
-  transition: border-color 0.2s ease;
+  transition: all 0.35s cubic-bezier(0.21, 1.02, 0.73, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
 }
 
 h1 {
@@ -70,13 +77,14 @@ p {
   padding: 0.75rem 1rem;
   border-radius: 9999px;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 0.9375rem;
 }
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 4px 15px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
 }
 
 .input::placeholder {
@@ -104,13 +112,13 @@ select.input {
   border-radius: 9999px;
   font-weight: 600;
   font-size: 0.875rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
   letter-spacing: -0.01em;
 }
 
 .btn:active {
-  transform: scale(0.97);
+  transform: scale(0.96) translateY(1px);
 }
 
 .btn-primary {
@@ -159,7 +167,7 @@ select.input {
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
@@ -169,18 +177,22 @@ select.input {
 }
 
 .grid-box.present:hover {
-  border-color: #555;
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(1.03);
 }
 
 .grid-box.absent {
   background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.4);
+  border-color: rgba(239, 68, 68, 0.3);
   color: #ef4444;
 }
 
 .grid-box.absent:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
 }
 
 /* ─── Animations ─── */
@@ -231,7 +243,7 @@ select.input {
 }
 
 .animate-slide-in {
-  animation: slide-in 0.5s ease-out forwards;
+  animation: slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
 }
 

@@ -112,9 +112,13 @@ export default function BunkEffect() {
 
         // Calculate classes needed to recover if below minimum
         let classesToRecover = 0;
-        if (afterPercentage < minPercentage && afterTotal > 0) {
-            classesToRecover = Math.ceil(
-                ((minPercentage / 100) * afterTotal - afterAttended) / (1 - (minPercentage / 100))
+        const denominator = 1 - (minPercentage / 100);
+        if (afterPercentage < minPercentage && afterTotal > 0 && denominator > 0) {
+            classesToRecover = Math.max(
+                0,
+                Math.ceil(
+                    ((minPercentage / 100) * afterTotal - afterAttended) / denominator
+                )
             );
         }
 
@@ -144,7 +148,7 @@ export default function BunkEffect() {
         <>
             <Navbar isStudent={true} onLogout={handleLogout} classId={classId} rollNumber={rollNumber} />
 
-            <div className="max-w-3xl mx-auto px-4 py-8">
+            <div className="max-w-3xl mx-auto px-4 py-8 pb-24">
 
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold">Skip Effect Calculator</h1>

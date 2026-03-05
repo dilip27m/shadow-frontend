@@ -90,6 +90,7 @@ export default function AdminDashboard() {
     const fileInputRef = useRef(null);
     const autoRelockTimerRef = useRef(null);
     const cropperRef = useRef(null);
+    const lockBannerRef = useRef(null);
     const allowedRollSet = new Set(classRollNumbers);
 
     // Check if viewing past date
@@ -107,6 +108,7 @@ export default function AdminDashboard() {
     // Load attendance for selected date
     const loadAttendanceForDate = useCallback(async (date, cId) => {
         try {
+
             const res = await api.get(`/attendance/by-date/${cId}/${date}`);
             if (res.data && res.data.periods && res.data.periods.length > 0) {
                 // Load saved attendance
@@ -158,7 +160,7 @@ export default function AdminDashboard() {
             setIsDateLocked(false);
             setAutoRelockArmed(false);
         }
-    }, []);
+    }, [notify]);
 
     useEffect(() => {
         const storedClassId = localStorage.getItem('adminClassId');
@@ -214,6 +216,8 @@ export default function AdminDashboard() {
         }
     }, [selectedDate, classId, subjects, loadAttendanceForDate]);
 
+
+
     const clearAutoRelockTimer = useCallback(() => {
         if (autoRelockTimerRef.current) {
             clearTimeout(autoRelockTimerRef.current);
@@ -254,6 +258,11 @@ export default function AdminDashboard() {
     const handleLogout = () => {
         localStorage.removeItem('adminClassId');
         localStorage.removeItem('token');
+        // Clear student keys too (in case user had a student session in same browser)
+        localStorage.removeItem('studentClassId');
+        localStorage.removeItem('studentRoll');
+        localStorage.removeItem('studentClassName');
+        localStorage.removeItem('studentToken');
         router.push('/');
     };
 
@@ -642,6 +651,7 @@ export default function AdminDashboard() {
                 date: selectedDate,
                 periods: formattedPeriods
             });
+
             notify({ message: "Attendance Saved Successfully ✓", type: 'success' });
             setHasModifications(false);
             setIsDateLocked(true);
@@ -876,7 +886,10 @@ export default function AdminDashboard() {
                 </div>
 
                 {isDateLocked && periods.length > 0 && (
-                    <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div
+                        ref={lockBannerRef}
+                        className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                    >
                         <div className="flex items-start gap-2 text-amber-300 text-sm">
                             <Lock className="w-4 h-4 mt-0.5" />
                             <span>Saved attendance is locked to prevent accidental edits.</span>
@@ -1114,9 +1127,15 @@ export default function AdminDashboard() {
                 {/* ─── Add Class Button ─── */}
                 <div className="text-center my-6 flex flex-wrap gap-3 justify-center">
                     <button
-                        onClick={addPeriod}
+                        onClick={() => {
+                            if (isDateLocked) {
+                                // Scroll to unlock banner so admin knows what to do
+                                lockBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                return;
+                            }
+                            addPeriod();
+                        }}
                         className="btn btn-outline inline-flex w-auto px-6 items-center gap-2"
-                        disabled={isDateLocked}
                     >
                         <Plus className="w-4 h-4" />
                         Add Period
@@ -1255,8 +1274,8 @@ export default function AdminDashboard() {
                                             <div
                                                 key={roll}
                                                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition ${isBlocked
-                                                        ? 'bg-red-900/10 border-red-500/20'
-                                                        : 'bg-white/3 border-white/6 hover:border-white/12'
+                                                    ? 'bg-red-900/10 border-red-500/20'
+                                                    : 'bg-white/3 border-white/6 hover:border-white/12'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3">
@@ -1271,8 +1290,8 @@ export default function AdminDashboard() {
                                                     onClick={() => toggleBlockStudent(roll)}
                                                     disabled={togglingRoll === roll}
                                                     className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${isBlocked
-                                                            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-                                                            : 'bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20'
+                                                        ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
+                                                        : 'bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20'
                                                         } ${togglingRoll === roll ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 >
                                                     {togglingRoll === roll ? (
