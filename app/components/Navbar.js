@@ -63,10 +63,13 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
     const attnSeenKey = navClassId ? `attn_seen_${navClassId}_${rollNumber || 'admin'}` : null;
     const attendSeenKey = navClassId && rollNumber ? `attend_seen_${navClassId}_${rollNumber}` : null;
 
-    const attentionPath = isStudent && navClassId && rollNumber ? `/student/${navClassId}/${rollNumber}/attention` : '/admin/attention';
-    const attendancePath = isStudent && navClassId && rollNumber ? `/student/${navClassId}/${rollNumber}` : '/admin/dashboard';
+    const attentionPath = isStudent && navClassId && rollNumber
+        ? `/student/${navClassId}/${rollNumber}/attention`
+        : '/admin/attention';
+    const attendancePath = isStudent && navClassId && rollNumber
+        ? `/student/${navClassId}/${rollNumber}`
+        : '/admin/dashboard';
 
-    // Compare announcements with stored seen time
     useEffect(() => {
         if (!announcementsData || !attnSeenKey) return;
         const list = announcementsData.announcements || [];
@@ -76,7 +79,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         setHasNewAnnouncements(latest > stored);
     }, [announcementsData, attnSeenKey]);
 
-    // Compare attendance lastUpdated with stored seen time
     useEffect(() => {
         if (!reportData?.lastUpdated || !attendSeenKey) return;
         const current = new Date(reportData.lastUpdated).getTime();
@@ -84,7 +86,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         setHasNewAttendance(current > stored);
     }, [reportData?.lastUpdated, attendSeenKey]);
 
-    // Mark as seen when user is on the respective page
     useEffect(() => {
         if (pathname === attentionPath && attnSeenKey && announcementsData) {
             const list = announcementsData.announcements || [];
@@ -101,7 +102,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         }
     }, [pathname, announcementsData, reportData?.lastUpdated]);
 
-    // ── Shared right-slide drawer ──────────────────────────────────────────
+    // ── Drawer ─────────────────────────────────────────────────────────────
     const DrawerLink = ({ href, icon: Icon, label }) => {
         const active = pathname === href;
         return (
@@ -151,7 +152,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         </>
     );
 
-    // ── Bottom tab bar shared by both admin and student ─────────────────────
+    // ── Bottom tab bar ──────────────────────────────────────────────────────
     const TabItem = ({ onClick, label, active, dot = false, children }) => (
         <button onClick={onClick}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${active ? 'text-white' : 'text-white/30 hover:text-white/60'}`}>
@@ -167,41 +168,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         </button>
     );
 
-            {/* Dropdown menu */}
-            {isOpen && (
-                <div className="absolute top-full left-0 right-0 glass border-b border-white/6 animate-fade-in">
-                    <div className="max-w-5xl mx-auto px-4 py-3 space-y-0.5">
-                        {isAdmin ? (
-                            <>
-                                <NavLink href="/admin/attention" icon={AlertTriangle} label="Attention" />
-                                <NavLink href="/admin/subjects" icon={BookOpen} label="Subjects" />
-                                <NavLink href="/admin/dashboard" icon={LayoutDashboard} label="Attendance" />
-                                <NavLink href="/admin/dutyleave" icon={Zap} label="Duty Leave" />
-
-                                {navClassId && (
-                                    <NavLink href={`/admin/reports/${navClassId}`} icon={FileText} label="Reports" />
-                                )}
-                                <div className="border-t border-white/6 my-2"></div>
-                                <NavLink href="/guide" icon={HelpCircle} label="Guide" />
-                                <NavButton onClick={onLogout} icon={LogOut} label="Logout" danger />
-                            </>
-                        ) : isStudent ? (
-                            <>
-                                <NavLink href={`/student/${classId}/${rollNumber}/attention`} icon={AlertTriangle} label="Announcements" />
-                                <NavLink href={`/student/${classId}/${rollNumber}`} icon={LayoutDashboard} label="Attendance" />
-                                <NavLink href={`/student/${classId}/${rollNumber}/calendar`} icon={Calendar} label="Calendar" />
-                                <NavLink href={`/student/${classId}/${rollNumber}/bunk-effect`} icon={Zap} label="Skip Effect" />
-                                {onReportClick && (
-                                    <NavButton onClick={onReportClick} icon={Flag} label="Report Issue" />
-                                )}
-                                <div className="border-t border-white/6 my-2"></div>
-                                <NavLink href="/guide" icon={HelpCircle} label="Guide" />
-                                <NavButton onClick={onLogout} icon={LogOut} label="Logout" danger />
-                            </>
-                        ) : null}
-                    </div>
-                </div>
-            )}
     const BottomBar = ({ children }) => (
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/8 flex"
             style={{
@@ -231,6 +197,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                 </BottomBar>
 
                 <Drawer>
+                    <DrawerLink href="/admin/dutyleave" icon={Zap} label="Duty Leave" />
                     <DrawerLink href="/admin/subjects" icon={BookOpen} label="Subjects" />
                     {navClassId && <DrawerLink href={`/admin/reports/${navClassId}`} icon={FileText} label="Reports" />}
                     <div className="border-t border-white/6 my-2" />
@@ -257,7 +224,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     <TabItem label="Attend" active={isAttendanceActive} dot={hasNewAttendance} onClick={() => router.push(attendancePath)}>
                         <LayoutDashboard className="w-5 h-5" />
                     </TabItem>
-
                     <TabItem label="CGPA" active={isCalcActive} onClick={() => router.push(calcPath)}>
                         <Calculator className="w-5 h-5" />
                     </TabItem>

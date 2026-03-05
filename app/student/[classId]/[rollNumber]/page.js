@@ -60,18 +60,10 @@ export default function StudentDashboard() {
   );
 
   const announcementsKey = classId ? `/announcements/${classId}` : null;
-  const { data: announcementsResponse } = useSWR(
-    announcementsKey,
-    fetcher,
-    swrConfig
-  );
+  const { data: announcementsResponse } = useSWR(announcementsKey, fetcher, swrConfig);
   const allAnnouncements = announcementsResponse?.announcements || [];
 
-  const { data: reportsResponse } = useSWR(
-    reportsKey,
-    fetcher,
-    swrConfig
-  );
+  const { data: reportsResponse } = useSWR(reportsKey, fetcher, swrConfig);
 
   const loading = reportLoading && !data;
 
@@ -87,22 +79,18 @@ export default function StudentDashboard() {
     }
   }, [error]);
 
-  // History/Works Modal
   const [historyModal, setHistoryModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [modalTab, setModalTab] = useState('history'); // 'history' | 'works'
+  const [modalTab, setModalTab] = useState('history');
 
-  // Report Issue Modal State (Removed - converted to inline confirm)
   const myReports = reportsResponse?.reports || [];
 
-  // Subject sort & filter
   const [subjectSort, setSubjectSort] = useState('default');
   const [subjectFilter, setSubjectFilter] = useState('all');
 
-  // Load saved min percentage from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('studentMinPercentage');
     if (saved) setMinPercentage(parseInt(saved));
@@ -114,7 +102,6 @@ export default function StudentDashboard() {
     localStorage.setItem('studentMinPercentage', val.toString());
   };
 
-  // Calculate dynamic bunk message based on student's threshold
   const getBunkMessage = (attended, total, percentage) => {
     if (total === 0) return { text: 'No classes yet', type: 'neutral' };
 
@@ -143,14 +130,11 @@ export default function StudentDashboard() {
     return { text: `${diffDays}d left`, type: 'safe' };
   };
 
-  // Fetching is now handled by SWR and localStorage caching above
-
   const handleLogout = () => {
     localStorage.removeItem('studentClassId');
     localStorage.removeItem('studentRoll');
     localStorage.removeItem('studentClassName');
     localStorage.removeItem('studentToken');
-    // Clear calculator data (stored in sessionStorage for privacy)
     sessionStorage.removeItem('shadow_calc_sgpa');
     sessionStorage.removeItem('shadow_calc_cgpa');
     router.push('/');
@@ -160,7 +144,7 @@ export default function StudentDashboard() {
     setHistoryModal(true);
     setSelectedSubject(subjectName);
     setSelectedSubjectId(subjectId);
-    setModalTab('history'); // Reset to history tab by default
+    setModalTab('history');
     setHistoryLoading(true);
     setHistoryData([]);
 
@@ -169,26 +153,17 @@ export default function StudentDashboard() {
       setHistoryData(res.data.history);
     } catch (err) {
       notify({ message: "Failed to load history", type: 'error' });
-      // Keep modal open so they can switch to works if needed
-      setHistoryLoading(false);
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  // Get subject specific works
-
-
-
-  // Get subject specific works
   const subjectWorks = selectedSubjectId
     ? allAnnouncements.filter(a => a.subjectId === selectedSubjectId || a.subjectName === selectedSubject)
     : [];
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   if (!mounted || loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading Report...</div>;
   if (!data) return <div className="flex h-screen items-center justify-center text-[var(--text-dim)]">Student Not Found</div>;
@@ -220,7 +195,6 @@ export default function StudentDashboard() {
             </div>
           </div>
         </div>
-
 
         {/* Minimum Attendance Slider */}
         <div className="card mb-6">
@@ -257,9 +231,7 @@ export default function StudentDashboard() {
             let subjects = [...(data.subjects || [])];
 
             if (subjects.length === 0) return (
-              <p className="text-center text-[var(--text-dim)] py-8">
-                No subjects found.
-              </p>
+              <p className="text-center text-[var(--text-dim)] py-8">No subjects found.</p>
             );
 
             return subjects.map((sub, idx) => {
@@ -271,8 +243,7 @@ export default function StudentDashboard() {
                 <div key={sub._id || idx} className="card relative group hover:border-[var(--text-dim)] transition-colors cursor-pointer" onClick={() => fetchHistory(sub._id, sub.subjectName)}>
                   <div className="flex justify-between items-center mb-3">
                     <h2 className="text-lg font-semibold">{sub.subjectName}</h2>
-                    <span className={`px-3 py-1 rounded-md text-sm font-semibold ${isSafe ? 'bg-[var(--success)] text-[var(--success-text)]' : 'bg-[var(--danger)] text-[var(--danger-text)]'
-                      }`}>
+                    <span className={`px-3 py-1 rounded-md text-sm font-semibold ${isSafe ? 'bg-[var(--success)] text-[var(--success-text)]' : 'bg-[var(--danger)] text-[var(--danger-text)]'}`}>
                       {percentage.toFixed(1)}%
                     </span>
                   </div>
@@ -315,13 +286,13 @@ export default function StudentDashboard() {
           })()}
         </div>
 
-        {/* --- Report Info --- */}
+        {/* Report Info */}
         <div className="mt-5 flex items-start gap-2 text-xs text-[var(--text-dim)] px-2">
           <div className="w-4 h-4 rounded-full border border-[var(--text-dim)] flex flex-shrink-0 items-center justify-center font-bold text-[9px] opacity-70 mt-0.5">?</div>
           <p className="opacity-80">To report incorrect attendance, tap on a subject and click the <strong>Dispute</strong> button next to the absent date.</p>
         </div>
 
-        {/* --- History & Works Modal --- */}
+        {/* History & Works Modal */}
         {historyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in">
             <div
@@ -381,8 +352,9 @@ export default function StudentDashboard() {
                     ) : (
                       <div className="space-y-2">
                         {historyData.map((record, i) => {
-                          const isPresent = record.status === 'Present';
-                          // record.date is a MongoDB ISO Date → extract YYYY-MM-DD first
+                          const isAbsent = record.status === 'Absent';
+                          const isDL = record.status === 'Present (DL)';
+                          // extract YYYY-MM-DD directly to avoid UTC→local day shift
                           const datePart = typeof record.date === 'string'
                             ? record.date.slice(0, 10)
                             : new Date(record.date).toISOString().slice(0, 10);
@@ -398,7 +370,8 @@ export default function StudentDashboard() {
                                 })}
                               </span>
                               <div className="flex items-center gap-2">
-                                {!isPresent && (
+                                {/* Dispute button — only for genuine absences, not DL */}
+                                {isAbsent && (
                                   <button
                                     onClick={async () => {
                                       const matchedSub = data?.subjects?.find(
@@ -431,15 +404,24 @@ export default function StudentDashboard() {
                                     Dispute
                                   </button>
                                 )}
-                                <span className={`
-                                  text-xs font-bold px-3 py-1 rounded-lg border
-                                  ${isPresent
-                                    ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-400'
-                                    : 'bg-red-500/12 border-red-500/30 text-red-400'
-                                  }
-                                `}>
-                                  {record.status}
-                                </span>
+
+                                {/* Status badge — three states */}
+                                {isDL ? (
+                                  <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-lg border bg-sky-500/12 border-sky-500/30 text-sky-400">
+                                    Present
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-700/40 border border-sky-500/30 text-sky-200 font-bold leading-none">
+                                      DL
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${
+                                    isAbsent
+                                      ? 'bg-red-500/12 border-red-500/30 text-red-400'
+                                      : 'bg-emerald-500/12 border-emerald-500/30 text-emerald-400'
+                                  }`}>
+                                    {record.status}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -501,7 +483,7 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      {/* --- My Reports Section --- */}
+      {/* My Reports Section */}
       <div className="max-w-2xl mx-auto px-4 pb-24">
         <h2 className="text-sm uppercase text-[var(--text-dim)] mb-4 mt-8">My Disputes</h2>
         {myReports.length === 0 ? (
@@ -519,10 +501,11 @@ export default function StudentDashboard() {
                       {new Date(r.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${r.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                    r.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                     r.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                      'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                    }`}>
+                    'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  }`}>
                     {r.status}
                   </span>
                 </div>
