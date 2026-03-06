@@ -196,6 +196,27 @@ export default function StudentDashboard() {
           </div>
         </div>
 
+        {/* Promotions Banner */}
+        <div
+          onClick={() => router.push('/promotions')}
+          className="mb-6 rounded-2xl p-4 cursor-pointer relative overflow-hidden group shadow-lg shadow-violet-900/10 border border-violet-500/20 bg-gradient-to-r from-violet-600/10 via-fuchsia-600/10 to-indigo-600/10 hover:from-violet-600/20 hover:to-indigo-600/20 transition-all duration-300"
+        >
+          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex flex-col">
+              <h3 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400 flex items-center gap-2">
+                ✨ Campus Discover
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">Find new apps, events, and tools by students</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-300 group-hover:scale-110 transition-transform border border-violet-500/30">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         {/* Minimum Attendance Slider */}
         <div className="card mb-6">
           <div className="flex justify-between items-center mb-3">
@@ -414,11 +435,10 @@ export default function StudentDashboard() {
                                     </span>
                                   </span>
                                 ) : (
-                                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${
-                                    isAbsent
-                                      ? 'bg-red-500/12 border-red-500/30 text-red-400'
-                                      : 'bg-emerald-500/12 border-emerald-500/30 text-emerald-400'
-                                  }`}>
+                                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${isAbsent
+                                    ? 'bg-red-500/12 border-red-500/30 text-red-400'
+                                    : 'bg-emerald-500/12 border-emerald-500/30 text-emerald-400'
+                                    }`}>
                                     {record.status}
                                   </span>
                                 )}
@@ -501,11 +521,10 @@ export default function StudentDashboard() {
                       {new Date(r.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                    r.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${r.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                     r.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                    'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                  }`}>
+                      'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                    }`}>
                     {r.status}
                   </span>
                 </div>

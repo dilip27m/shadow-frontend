@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Shield, Trash2, RefreshCw, LogOut, AlertTriangle,
     CheckCircle, X, Eye, EyeOff, Loader2, Database,
-    Users, KeyRound, ChevronRight
+    Users, KeyRound, ChevronRight, Megaphone, Check, XCircle
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
@@ -135,6 +135,13 @@ export default function SuperAdminPage() {
 
     const [toast, setToast] = useState(null);
 
+    const [activeTab, setActiveTab] = useState('classes'); // 'classes' | 'promotions'
+
+    const [promotions, setPromotions] = useState([]);
+    const [loadingPromotions, setLoadingPromotions] = useState(false);
+    const [promotionsError, setPromotionsError] = useState('');
+    const [updatingPromotion, setUpdatingPromotion] = useState(null);
+
     // ── Fetch classes ──────────────────────────────────────────────────────────
     const fetchClasses = useCallback(async (key) => {
         setLoadingClasses(true);
@@ -153,6 +160,27 @@ export default function SuperAdminPage() {
             setFetchError(err.message || 'Failed to load classes.');
         } finally {
             setLoadingClasses(false);
+        }
+    }, []);
+
+    // ── Fetch promotions ───────────────────────────────────────────────────────
+    const fetchPromotions = useCallback(async (key) => {
+        setLoadingPromotions(true);
+        setPromotionsError('');
+        try {
+            const res = await fetch(`${API_BASE}/promotions/all`, {
+                headers: { 'X-Super-Admin-Key': key },
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            setPromotions(data.data || []);
+        } catch (err) {
+            setPromotionsError(err.message || 'Failed to load promotions.');
+        } finally {
+            setLoadingPromotions(false);
         }
     }, []);
 
@@ -176,6 +204,7 @@ export default function SuperAdminPage() {
             setMasterKey(keyInput.trim());
             setClasses(data.classes || []);
             setIsUnlocked(true);
+            fetchPromotions(keyInput.trim());
         } catch {
             setUnlockError('Connection error. Is the backend running?');
         } finally {
@@ -206,6 +235,32 @@ export default function SuperAdminPage() {
             } finally {
                 setLoadingDetails('');
             }
+        }
+    };
+
+    // ── Promotion status handler ───────────────────────────────────────────────
+    const handleStatusChange = async (targetPromotion, newStatus) => {
+        setUpdatingPromotion(targetPromotion._id);
+        try {
+            const res = await fetch(`${API_BASE}/promotions/${targetPromotion._id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Super-Admin-Key': masterKey
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+
+            setToast({ type: 'success', message: `Promotion "${targetPromotion.title}" marked as ${newStatus}` });
+            fetchPromotions(masterKey);
+        } catch (err) {
+            setToast({ type: 'error', message: err.message || 'Failed to update status.' });
+        } finally {
+            setUpdatingPromotion(null);
         }
     };
 
@@ -242,9 +297,11 @@ export default function SuperAdminPage() {
         setIsUnlocked(false);
         setClasses([]);
         setFetchError('');
+        setPromotionsError('');
         setPurgeTarget(null);
         setExpandedClassId(null);
         setDetailsCache({});
+        setActiveTab('classes');
     };
 
     // ───────────────────────────────────────────────────────────────────────────
@@ -330,8 +387,11 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => fetchClasses(masterKey)}
-                            disabled={loadingClasses}
+                            onClick={() => {
+                                if (activeTab === 'classes') fetchClasses(masterKey);
+                                else fetchPromotions(masterKey);
+                            }}
+                            disabled={loadingClasses || loadingPromotions}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/8 text-xs text-gray-300 transition disabled:opacity-50"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${loadingClasses ? 'animate-spin' : ''}`} />
@@ -382,159 +442,286 @@ export default function SuperAdminPage() {
                     </div>
                 </div>
 
-                {/* ── Section header ── */}
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-gray-300">Class Registry</h2>
-                    <span className="text-xs text-gray-600 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
-                        {classes.length} class{classes.length !== 1 ? 'es' : ''}
-                    </span>
+                {/* ── Tabs ── */}
+                <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-2">
+                    <button
+                        onClick={() => setActiveTab('classes')}
+                        className={`text-sm font-semibold pb-2 transition-colors relative ${activeTab === 'classes' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                    >
+                        Class Registry
+                        {activeTab === 'classes' && (
+                            <div className="absolute bottom-[-9px] left-0 w-full h-[2px] bg-violet-500 rounded-t-full" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('promotions')}
+                        className={`text-sm font-semibold pb-2 transition-colors relative flex items-center gap-2 ${activeTab === 'promotions' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                    >
+                        Promotions
+                        {activeTab === 'promotions' && (
+                            <div className="absolute bottom-[-9px] left-0 w-full h-[2px] bg-violet-500 rounded-t-full" />
+                        )}
+                    </button>
                 </div>
 
-                {/* ── Error ── */}
-                {fetchError && (
-                    <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 flex items-center gap-2 text-sm text-red-300">
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                        {fetchError}
-                    </div>
-                )}
-
-                {/* ── Loading ── */}
-                {loadingClasses && (
-                    <div className="flex items-center justify-center py-16 text-gray-500 gap-2 text-sm">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Loading classes...
-                    </div>
-                )}
-
-                {/* ── Empty ── */}
-                {!loadingClasses && !fetchError && classes.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 text-gray-600 gap-2">
-                        <Database className="w-8 h-8 opacity-40" />
-                        <p className="text-sm">No classes found in the database.</p>
-                    </div>
-                )}
-
-                {/* ── Class table ── */}
-                {!loadingClasses && classes.length > 0 && (
-                    <div className="rounded-2xl border border-white/8 overflow-hidden">
-                        {/* Table header */}
-                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 bg-white/[0.02] border-b border-white/8 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            <span>Class Name</span>
-                            <span className="hidden sm:block text-right">Class ID</span>
-                            <span className="hidden sm:block text-right">Students</span>
-                            <span className="text-right">Action</span>
+                {activeTab === 'classes' && (
+                    <>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-sm font-semibold text-gray-300">Registered Classes</h2>
+                            <span className="text-xs text-gray-600 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
+                                {classes.length} class{classes.length !== 1 ? 'es' : ''}
+                            </span>
                         </div>
 
-                        {/* Rows */}
-                        <div className="flex flex-col">
-                            {classes.map((cls, i) => {
-                                const isExpanded = expandedClassId === cls._id;
-                                const details = detailsCache[cls._id];
-                                const isLoading = loadingDetails === cls._id;
+                        {/* ── Error ── */}
+                        {fetchError && (
+                            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 flex items-center gap-2 text-sm text-red-300">
+                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                {fetchError}
+                            </div>
+                        )}
 
-                                return (
-                                    <div key={cls._id} className="flex flex-col border-b border-white/5 last:border-0 group">
-                                        <div
-                                            onClick={() => toggleRow(cls._id)}
-                                            className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-white/[0.04] transition cursor-pointer"
-                                        >
-                                            {/* Name */}
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400">
-                                                    {i + 1}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-white truncate">{cls.className}</p>
-                                                    <p className="text-xs text-gray-600 mt-0.5">
-                                                        {cls.createdAt
-                                                            ? new Date(cls.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                                                            : '—'}
-                                                    </p>
-                                                </div>
-                                            </div>
+                        {/* ── Loading ── */}
+                        {loadingClasses && (
+                            <div className="flex items-center justify-center py-16 text-gray-500 gap-2 text-sm">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Loading classes...
+                            </div>
+                        )}
 
-                                            {/* ID */}
-                                            <span className="hidden sm:block font-mono text-xs text-gray-500 text-right" title={cls._id}>
-                                                {cls._id.slice(-8)}
-                                            </span>
+                        {/* ── Empty ── */}
+                        {!loadingClasses && !fetchError && classes.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-600 gap-2">
+                                <Database className="w-8 h-8 opacity-40" />
+                                <p className="text-sm">No classes found in the database.</p>
+                            </div>
+                        )}
 
-                                            {/* Students */}
-                                            <span className="hidden sm:flex items-center justify-end gap-1 text-xs text-gray-400">
-                                                <Users className="w-3 h-3 text-gray-600" />
-                                                {cls.rollNumbers?.length ?? '—'}
-                                            </span>
+                        {/* ── Class table ── */}
+                        {!loadingClasses && classes.length > 0 && (
+                            <div className="rounded-2xl border border-white/8 overflow-hidden">
+                                {/* Table header */}
+                                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 bg-white/[0.02] border-b border-white/8 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <span>Class Name</span>
+                                    <span className="hidden sm:block text-right">Class ID</span>
+                                    <span className="hidden sm:block text-right">Students</span>
+                                    <span className="text-right">Action</span>
+                                </div>
 
-                                            {/* Purge button */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setPurgeTarget({ classId: cls._id, className: cls.className }); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 text-xs font-medium transition active:scale-95"
-                                                title="Purge this class"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                <span className="hidden sm:block">Purge</span>
-                                            </button>
-                                        </div>
+                                {/* Rows */}
+                                <div className="flex flex-col">
+                                    {classes.map((cls, i) => {
+                                        const isExpanded = expandedClassId === cls._id;
+                                        const details = detailsCache[cls._id];
+                                        const isLoading = loadingDetails === cls._id;
 
-                                        {/* Expanded Details Area */}
-                                        {isExpanded && (
-                                            <div className="bg-black/40 border-t border-white/5 p-5 animate-slide-up">
-                                                {isLoading ? (
-                                                    <div className="flex items-center justify-center py-8 text-gray-500 gap-2 text-sm">
-                                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                                        Loading metrics...
-                                                    </div>
-                                                ) : details ? (
-                                                    <div className="space-y-6">
-                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                                                                <p className="text-xs text-gray-400 mb-1">Total Attendance</p>
-                                                                <p className="text-lg font-semibold text-white">{details.attendancesCount}</p>
-                                                            </div>
-                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                                                                <p className="text-xs text-gray-400 mb-1">Reports</p>
-                                                                <p className="text-lg font-semibold text-white">{details.reportsCount}</p>
-                                                            </div>
-                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                                                                <p className="text-xs text-gray-400 mb-1">Announcements</p>
-                                                                <p className="text-lg font-semibold text-white">{details.announcementsCount}</p>
-                                                            </div>
-                                                            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                                                                <p className="text-xs text-gray-400 mb-1">Push Subs</p>
-                                                                <p className="text-lg font-semibold text-white">{details.pushSubscriptionsCount}</p>
-                                                            </div>
+                                        return (
+                                            <div key={cls._id} className="flex flex-col border-b border-white/5 last:border-0 group">
+                                                <div
+                                                    onClick={() => toggleRow(cls._id)}
+                                                    className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-white/[0.04] transition cursor-pointer"
+                                                >
+                                                    {/* Name */}
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400">
+                                                            {i + 1}
                                                         </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-white truncate">{cls.className}</p>
+                                                            <p className="text-xs text-gray-600 mt-0.5">
+                                                                {cls.createdAt
+                                                                    ? new Date(cls.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                                                                    : '—'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
 
-                                                        <div>
-                                                            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                                <Shield className="w-3.5 h-3.5" /> Blocked Roll Numbers ({details.blockedRollNumbers.length})
-                                                            </h3>
-                                                            {details.blockedRollNumbers.length > 0 ? (
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {details.blockedRollNumbers.map(roll => (
-                                                                        <span key={roll} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-mono">{roll}</span>
-                                                                    ))}
+                                                    {/* ID */}
+                                                    <span className="hidden sm:block font-mono text-xs text-gray-500 text-right" title={cls._id}>
+                                                        {cls._id.slice(-8)}
+                                                    </span>
+
+                                                    {/* Students */}
+                                                    <span className="hidden sm:flex items-center justify-end gap-1 text-xs text-gray-400">
+                                                        <Users className="w-3 h-3 text-gray-600" />
+                                                        {cls.rollNumbers?.length ?? '—'}
+                                                    </span>
+
+                                                    {/* Purge button */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setPurgeTarget({ classId: cls._id, className: cls.className }); }}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 hover:text-red-300 text-xs font-medium transition active:scale-95"
+                                                        title="Purge this class"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        <span className="hidden sm:block">Purge</span>
+                                                    </button>
+                                                </div>
+
+                                                {/* Expanded Details Area */}
+                                                {isExpanded && (
+                                                    <div className="bg-black/40 border-t border-white/5 p-5 animate-slide-up">
+                                                        {isLoading ? (
+                                                            <div className="flex items-center justify-center py-8 text-gray-500 gap-2 text-sm">
+                                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                                Loading metrics...
+                                                            </div>
+                                                        ) : details ? (
+                                                            <div className="space-y-6">
+                                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                        <p className="text-xs text-gray-400 mb-1">Total Attendance</p>
+                                                                        <p className="text-lg font-semibold text-white">{details.attendancesCount}</p>
+                                                                    </div>
+                                                                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                        <p className="text-xs text-gray-400 mb-1">Reports</p>
+                                                                        <p className="text-lg font-semibold text-white">{details.reportsCount}</p>
+                                                                    </div>
+                                                                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                        <p className="text-xs text-gray-400 mb-1">Announcements</p>
+                                                                        <p className="text-lg font-semibold text-white">{details.announcementsCount}</p>
+                                                                    </div>
+                                                                    <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                                                        <p className="text-xs text-gray-400 mb-1">Push Subs</p>
+                                                                        <p className="text-lg font-semibold text-white">{details.pushSubscriptionsCount}</p>
+                                                                    </div>
                                                                 </div>
-                                                            ) : (
-                                                                <p className="text-sm text-gray-500">No students are currently blocked.</p>
-                                                            )}
-                                                        </div>
+
+                                                                <div>
+                                                                    <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                                        <Shield className="w-3.5 h-3.5" /> Blocked Roll Numbers ({details.blockedRollNumbers.length})
+                                                                    </h3>
+                                                                    {details.blockedRollNumbers.length > 0 ? (
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {details.blockedRollNumbers.map(roll => (
+                                                                                <span key={roll} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-mono">{roll}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-500">No students are currently blocked.</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="py-4 text-center text-red-400 text-sm">Failed to load details</div>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <div className="py-4 text-center text-red-400 text-sm">Failed to load details</div>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Warning footer ── */}
+                        <p className="text-center text-xs text-gray-700 mt-8">
+                            ⚠ Purge is permanent and irreversible. All associated data will be deleted from the database.
+                        </p>
+                    </>
                 )}
 
-                {/* ── Warning footer ── */}
-                <p className="text-center text-xs text-gray-700 mt-8">
-                    ⚠ Purge is permanent and irreversible. All associated data will be deleted from the database.
-                </p>
+                {/* ── Promotions Tab ── */}
+                {activeTab === 'promotions' && (
+                    <>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-sm font-semibold text-gray-300">Promotion Requests</h2>
+                            <span className="text-xs text-gray-600 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
+                                {promotions.length} request{promotions.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+
+                        {promotionsError && (
+                            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 flex items-center gap-2 text-sm text-red-300">
+                                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                                {promotionsError}
+                            </div>
+                        )}
+
+                        {loadingPromotions && (
+                            <div className="flex items-center justify-center py-16 text-gray-500 gap-2 text-sm">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Loading promotions...
+                            </div>
+                        )}
+
+                        {!loadingPromotions && !promotionsError && promotions.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-600 gap-2">
+                                <Megaphone className="w-8 h-8 opacity-40" />
+                                <p className="text-sm">No promotion requests found.</p>
+                            </div>
+                        )}
+
+                        {!loadingPromotions && promotions.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {promotions.map((promo) => (
+                                    <div key={promo._id} className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden flex flex-col">
+                                        {promo.imageUrl && (
+                                            <div className="w-full h-32 bg-white/5 relative">
+                                                <img src={promo.imageUrl} alt={promo.title} className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+                                        <div className="p-4 flex-1 flex flex-col">
+                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                <h3 className="font-semibold text-white truncate">{promo.title}</h3>
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${promo.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                    promo.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                        promo.status === 'Inactive' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                                                            'bg-amber-500/10 text-amber-400 border-amber-500/20' // Pending
+                                                    }`}>
+                                                    {promo.status}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-400 mb-3 line-clamp-2 flex-1">{promo.description}</p>
+
+                                            <div className="bg-black/20 rounded-lg p-2.5 mb-4 text-[10px] text-gray-500 space-y-1">
+                                                <p><span className="text-gray-400">By:</span> {promo.submittedBy}</p>
+                                                <p className="truncate"><span className="text-gray-400">Link:</span> <a href={promo.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">{promo.linkUrl}</a></p>
+                                                <p><span className="text-gray-400">Date:</span> {new Date(promo.createdAt).toLocaleDateString()}</p>
+                                                <p><span className="text-gray-400">Upvotes:</span> {promo.upvotes?.length || 0}</p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 mt-auto">
+                                                {promo.status !== 'Approved' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange(promo, 'Approved')}
+                                                        disabled={updatingPromotion === promo._id}
+                                                        className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium border border-emerald-500/20 transition disabled:opacity-50"
+                                                    >
+                                                        {updatingPromotion === promo._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                        Approve
+                                                    </button>
+                                                )}
+                                                {promo.status !== 'Rejected' && promo.status !== 'Inactive' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange(promo, 'Rejected')}
+                                                        disabled={updatingPromotion === promo._id}
+                                                        className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition disabled:opacity-50"
+                                                    >
+                                                        {updatingPromotion === promo._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                                                        Reject
+                                                    </button>
+                                                )}
+                                                {promo.status === 'Approved' && (
+                                                    <button
+                                                        onClick={() => handleStatusChange(promo, 'Inactive')}
+                                                        disabled={updatingPromotion === promo._id}
+                                                        className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 text-xs font-medium border border-gray-500/20 transition disabled:opacity-50"
+                                                    >
+                                                        {updatingPromotion === promo._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                                                        Make Inactive
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
             </main>
 
             {/* ── Dialogs ── */}

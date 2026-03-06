@@ -7,7 +7,7 @@ import api from '@/utils/api';
 import {
     LayoutDashboard, Calendar, FileText,
     LogOut, Zap, BookOpen, Flag, Menu, X,
-    HelpCircle, Calculator, Megaphone
+    HelpCircle, Calculator, Megaphone, Star
 } from 'lucide-react';
 
 // ── Spear SVG for Attention ─────────────────────────────────────────────────
@@ -235,6 +235,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                 </BottomBar>
 
                 <Drawer>
+                    <DrawerLink href="/promotions" icon={Star} label="Promotions & Apps" />
                     <DrawerLink href={`/student/${classId}/${rollNumber}/calendar`} icon={Calendar} label="Calendar" />
                     <DrawerLink href={`/student/${classId}/${rollNumber}/bunk-effect`} icon={Zap} label="Skip Effect" />
                     {onReportClick && <DrawerButton onClick={onReportClick} icon={Flag} label="Report Issue" />}
