@@ -9,7 +9,7 @@ export default function AdminNavbar({ title = "Admin Panel" }) {
         router.push('/');
     };
 
-    return (
+    return (    
         <nav className="bg-white border-b border-gray-200 p-4 sticky top-0 z-50">
             <div className="max-w-6xl mx-auto flex justify-between items-center">
 
@@ -24,6 +24,12 @@ export default function AdminNavbar({ title = "Admin Panel" }) {
                         className="text-xs px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
                     >
                         Attendance Section
+                    </button>
+                    <button
+                        onClick={() => router.push('/admin/dutyleave')}
+                        className="text-xs px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
+                    >
+                        Duty Leave
                     </button>
                     <button
                         onClick={() => router.push('/admin/subjects')}

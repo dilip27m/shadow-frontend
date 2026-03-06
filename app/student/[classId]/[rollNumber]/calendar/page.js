@@ -6,12 +6,39 @@ import Calendar from '@/app/components/Calendar';
 import api from '@/utils/api';
 import useSWR from 'swr';
 
+// Status badge: Present = green, Absent = red, Present (DL) = sky/cyan
+function StatusBadge({ status }) {
+    if (status === 'Present (DL)') {
+        return (
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-semibold bg-sky-900/30 border border-sky-500/30 text-sky-300">
+                Present
+                <span className="text-xs px-1.5 py-0.5 rounded bg-sky-700/40 border border-sky-500/30 text-sky-200 font-bold leading-none">
+                    DL
+                </span>
+            </span>
+        );
+    }
+    if (status === 'Present') {
+        return (
+            <span className="px-3 py-1 rounded-md text-sm font-semibold bg-[var(--success)] text-[var(--success-text)]">
+                Present
+            </span>
+        );
+    }
+    return (
+        <span className="px-3 py-1 rounded-md text-sm font-semibold bg-[var(--danger)] text-[var(--danger-text)]">
+            Absent
+        </span>
+    );
+}
+
 export default function StudentCalendar() {
     const params = useParams();
     const { classId, rollNumber } = params;
     const router = useRouter();
     const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
     const fetcher = (url) => api.get(url).then((res) => res.data);
+
     const reportKey = classId && rollNumber ? `/student/report/${classId}/${rollNumber}` : null;
     const datesKey = classId ? `/attendance/dates/${classId}` : null;
     const dayAttendanceKey = classId && rollNumber && selectedDate
@@ -22,11 +49,8 @@ export default function StudentCalendar() {
 
     const getCachedReport = () => {
         if (typeof window === 'undefined' || !reportCacheKey) return null;
-        try {
-            return JSON.parse(localStorage.getItem(reportCacheKey) || 'null');
-        } catch {
-            return null;
-        }
+        try { return JSON.parse(localStorage.getItem(reportCacheKey) || 'null'); }
+        catch { return null; }
     };
 
     const swrConfig = {
@@ -37,36 +61,20 @@ export default function StudentCalendar() {
         errorRetryInterval: 5000
     };
 
-    const { data: reportData, isLoading: reportLoading } = useSWR(
-        reportKey,
-        fetcher,
-        {
-            ...swrConfig,
-            fallbackData: getCachedReport(),
-            onSuccess: (resData) => {
-                if (typeof window !== 'undefined') {
-                    if (reportCacheKey) {
-                        localStorage.setItem(reportCacheKey, JSON.stringify(resData));
-                    }
-                    if (subjectCacheKey && Array.isArray(resData?.subjects)) {
-                        localStorage.setItem(subjectCacheKey, JSON.stringify(resData.subjects));
-                    }
-                }
+    const { data: reportData, isLoading: reportLoading } = useSWR(reportKey, fetcher, {
+        ...swrConfig,
+        fallbackData: getCachedReport(),
+        onSuccess: (resData) => {
+            if (typeof window !== 'undefined') {
+                if (reportCacheKey) localStorage.setItem(reportCacheKey, JSON.stringify(resData));
+                if (subjectCacheKey && Array.isArray(resData?.subjects))
+                    localStorage.setItem(subjectCacheKey, JSON.stringify(resData.subjects));
             }
         }
-    );
+    });
 
-    const { data: attendanceDatesResponse, isLoading: datesLoading } = useSWR(
-        datesKey,
-        fetcher,
-        swrConfig
-    );
-
-    const { data: dayAttendanceData, isLoading: dayLoading } = useSWR(
-        dayAttendanceKey,
-        fetcher,
-        swrConfig
-    );
+    const { data: attendanceDatesResponse, isLoading: datesLoading } = useSWR(datesKey, fetcher, swrConfig);
+    const { data: dayAttendanceData, isLoading: dayLoading } = useSWR(dayAttendanceKey, fetcher, swrConfig);
 
     const className = reportData?.className || '';
     // Fix: extract date part directly to avoid UTC→local day shift (e.g. Feb 25 UTC midnight → Feb 24 IST)
@@ -91,26 +99,16 @@ export default function StudentCalendar() {
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-
-        const isToday = date.toDateString() === today.toDateString();
-        const isYesterday = date.toDateString() === yesterday.toDateString();
-
-        if (isToday) return "Today";
-        if (isYesterday) return "Yesterday";
-
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
+        if (date.toDateString() === today.toDateString()) return 'Today';
+        if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     };
 
     const [mounted, setMounted] = useState(false);
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    useEffect(() => { setMounted(true); }, []);
 
-    if (!mounted || loading) return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
+    if (!mounted || loading)
+        return <div className="flex h-screen items-center justify-center text-white animate-pulse">Loading...</div>;
 
     return (
         <>
@@ -123,7 +121,6 @@ export default function StudentCalendar() {
                     <p className="text-[var(--text-dim)]">{className} - Roll No. {rollNumber}</p>
                 </div>
 
-                {/* Calendar */}
                 <div className="mb-6">
                     <Calendar
                         selectedDate={selectedDate}
@@ -132,7 +129,6 @@ export default function StudentCalendar() {
                     />
                 </div>
 
-                {/* Day-specific Attendance */}
                 {selectedDate && (
                     <div className="card">
                         <h2 className="text-sm uppercase text-[var(--text-dim)] mb-4">
@@ -146,24 +142,19 @@ export default function StudentCalendar() {
                         ) : (
                             <div className="space-y-3">
                                 {dayAttendance.periods.map((period, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-3 bg-[var(--bg)] rounded-md border border-[var(--border)]">
+                                    <div key={idx}
+                                        className="flex items-center justify-between p-3 bg-[var(--bg)] rounded-md border border-[var(--border)]">
                                         <div className="flex items-center gap-3">
                                             <span className="text-sm font-bold text-[var(--text-dim)]">P{period.periodNum}</span>
                                             <span className="text-sm">{period.subjectName}</span>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-md text-sm font-semibold ${period.status === 'Present'
-                                            ? 'bg-[var(--success)] text-[var(--success-text)]'
-                                            : 'bg-[var(--danger)] text-[var(--danger-text)]'
-                                            }`}>
-                                            {period.status}
-                                        </span>
+                                        <StatusBadge status={period.status} />
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 )}
-
             </div>
         </>
     );

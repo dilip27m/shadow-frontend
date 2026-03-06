@@ -63,10 +63,13 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
     const attnSeenKey = navClassId ? `attn_seen_${navClassId}_${rollNumber || 'admin'}` : null;
     const attendSeenKey = navClassId && rollNumber ? `attend_seen_${navClassId}_${rollNumber}` : null;
 
-    const attentionPath = isStudent && navClassId && rollNumber ? `/student/${navClassId}/${rollNumber}/attention` : '/admin/attention';
-    const attendancePath = isStudent && navClassId && rollNumber ? `/student/${navClassId}/${rollNumber}` : '/admin/dashboard';
+    const attentionPath = isStudent && navClassId && rollNumber
+        ? `/student/${navClassId}/${rollNumber}/attention`
+        : '/admin/attention';
+    const attendancePath = isStudent && navClassId && rollNumber
+        ? `/student/${navClassId}/${rollNumber}`
+        : '/admin/dashboard';
 
-    // Compare announcements with stored seen time
     useEffect(() => {
         if (!announcementsData || !attnSeenKey) return;
         const list = announcementsData.announcements || [];
@@ -76,7 +79,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         setHasNewAnnouncements(latest > stored);
     }, [announcementsData, attnSeenKey]);
 
-    // Compare attendance lastUpdated with stored seen time
     useEffect(() => {
         if (!reportData?.lastUpdated || !attendSeenKey) return;
         const current = new Date(reportData.lastUpdated).getTime();
@@ -84,7 +86,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         setHasNewAttendance(current > stored);
     }, [reportData?.lastUpdated, attendSeenKey]);
 
-    // Mark as seen when user is on the respective page
     useEffect(() => {
         if (pathname === attentionPath && attnSeenKey && announcementsData) {
             const list = announcementsData.announcements || [];
@@ -101,7 +102,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         }
     }, [pathname, announcementsData, reportData?.lastUpdated]);
 
-    // ── Shared right-slide drawer ──────────────────────────────────────────
+    // ── Drawer ─────────────────────────────────────────────────────────────
     const DrawerLink = ({ href, icon: Icon, label }) => {
         const active = pathname === href;
         return (
@@ -151,7 +152,7 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
         </>
     );
 
-    // ── Bottom tab bar shared by both admin and student ─────────────────────
+    // ── Bottom tab bar ──────────────────────────────────────────────────────
     const TabItem = ({ onClick, label, active, dot = false, children }) => (
         <button onClick={onClick}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${active ? 'text-white' : 'text-white/30 hover:text-white/60'}`}>
@@ -190,6 +191,9 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     <TabItem label="Attention" active={pathname === '/admin/attention'} dot={hasNewAnnouncements} onClick={() => router.push('/admin/attention')}>
                         <Megaphone className="w-5 h-5" />
                     </TabItem>
+                    <TabItem label="Duty Leave" active={pathname === '/admin/dutyleave'} onClick={() => router.push('/admin/dutyleave')}>
+                        <Zap className="w-5 h-5" />
+                    </TabItem>
                     <TabItem label="More" active={drawerOpen} onClick={() => setDrawerOpen(true)}>
                         <Menu className="w-5 h-5" />
                     </TabItem>
@@ -222,7 +226,6 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     <TabItem label="Attend" active={isAttendanceActive} dot={hasNewAttendance} onClick={() => router.push(attendancePath)}>
                         <LayoutDashboard className="w-5 h-5" />
                     </TabItem>
-
                     <TabItem label="CGPA" active={isCalcActive} onClick={() => router.push(calcPath)}>
                         <Calculator className="w-5 h-5" />
                     </TabItem>
