@@ -191,13 +191,15 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     <TabItem label="Attention" active={pathname === '/admin/attention'} dot={hasNewAnnouncements} onClick={() => router.push('/admin/attention')}>
                         <Megaphone className="w-5 h-5" />
                     </TabItem>
+                    <TabItem label="Duty Leave" active={pathname === '/admin/dutyleave'} onClick={() => router.push('/admin/dutyleave')}>
+                        <Zap className="w-5 h-5" />
+                    </TabItem>
                     <TabItem label="More" active={drawerOpen} onClick={() => setDrawerOpen(true)}>
                         <Menu className="w-5 h-5" />
                     </TabItem>
                 </BottomBar>
 
                 <Drawer>
-                    <DrawerLink href="/admin/dutyleave" icon={Zap} label="Duty Leave" />
                     <DrawerLink href="/admin/subjects" icon={BookOpen} label="Subjects" />
                     {navClassId && <DrawerLink href={`/admin/reports/${navClassId}`} icon={FileText} label="Reports" />}
                     <div className="border-t border-white/6 my-2" />
