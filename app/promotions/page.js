@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Megaphone, PlusCircle, ArrowLeft,
-    ExternalLink, CheckCircle, AlertTriangle, Loader2, User, Heart
+    ExternalLink, CheckCircle, AlertTriangle, Loader2, User, ArrowUp
 } from 'lucide-react';
+import BubbleButton from '../components/BubbleButton';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
@@ -36,11 +37,13 @@ export default function PromotionsPage() {
         description: '',
         linkUrl: '',
         imageUrl: '',
+        contactDetails: '',
         submittedBy: ''
     });
     const [submitting, setSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     // My Pitches State
     const [myPitches, setMyPitches] = useState([]);
@@ -132,6 +135,33 @@ export default function PromotionsPage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsUploadingImage(true);
+        setSubmitError('');
+
+        const data = new FormData();
+        data.append('image', file);
+
+        try {
+            const res = await fetch(`${API_BASE}/upload/image`, {
+                method: 'POST',
+                body: data
+            });
+            const result = await res.json();
+
+            if (!res.ok) throw new Error(result.message || 'Failed to upload image');
+
+            setFormData(prev => ({ ...prev, imageUrl: result.imageUrl }));
+        } catch (err) {
+            setSubmitError(err.message || 'Error uploading image');
+        } finally {
+            setIsUploadingImage(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -158,7 +188,7 @@ export default function PromotionsPage() {
                 }
             }
 
-            setFormData({ title: '', description: '', linkUrl: '', imageUrl: '', submittedBy: '' });
+            setFormData({ title: '', description: '', linkUrl: '', imageUrl: '', contactDetails: '', submittedBy: '' });
             setTimeout(() => {
                 setSubmitSuccess(false);
                 setActiveTab('mypitches');
@@ -252,43 +282,61 @@ export default function PromotionsPage() {
                         )}
 
                         {!loadingPromotions && promotions.map(promo => (
-                            <div key={promo._id} className="group relative rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-violet-500/30 transition-all duration-300 shadow-xl shadow-black/50">
+                            <div key={promo._id} className="group flex flex-col relative rounded-2xl border border-white/10 bg-[#0f0f13] overflow-hidden hover:border-white/20 transition-all duration-500 shadow-2xl shadow-black/80">
                                 {promo.imageUrl && (
-                                    <div className="w-full h-40 bg-zinc-900 relative">
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
-                                        <img src={promo.imageUrl} alt={promo.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                    <div className="w-full h-56 bg-zinc-900 overflow-hidden shrink-0">
+                                        <img src={promo.imageUrl} alt={promo.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                                     </div>
                                 )}
-                                <div className={`p-5 relative z-20 ${promo.imageUrl ? '-mt-16' : ''}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h2 className={`font-bold text-xl ${promo.imageUrl ? 'text-white drop-shadow-md' : 'text-fuchsia-100'}`}>
+                                <div className="p-6 relative z-20 flex flex-col flex-1">
+                                    <div className="flex justify-between items-start mb-3 gap-4">
+                                        <h2 className="font-bold text-xl text-white tracking-wide">
                                             {promo.title}
                                         </h2>
-                                        <span className="text-[10px] bg-black/50 backdrop-blur-md px-2 py-1 rounded-md text-gray-400 border border-white/10">Promoted by {promo.submittedBy}</span>
+                                        <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/5 px-2.5 py-1 rounded-md text-gray-400 border border-white/10 shrink-0">By {promo.submittedBy}</span>
                                     </div>
-                                    <p className={`text-sm leading-relaxed mb-5 ${promo.imageUrl ? 'text-gray-300' : 'text-gray-400'}`}>
+                                    <p className={`text-sm leading-relaxed mb-6 ${promo.imageUrl ? 'text-gray-300' : 'text-gray-400'}`}>
                                         {promo.description}
                                     </p>
                                     <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={() => handleUpvote(promo._id)}
-                                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border font-semibold text-sm transition-all active:scale-90 shadow-md ${promo.upvotes?.includes(userId)
-                                                ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
-                                                }`}
-                                        >
-                                            <Heart className={`w-4 h-4 ${promo.upvotes?.includes(userId) ? 'fill-current' : ''}`} />
-                                            {promo.upvotes?.length || 0}
-                                        </button>
-                                        <a
-                                            href={promo.linkUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-colors border border-white/10"
-                                        >
-                                            Check it out <ExternalLink className="w-4 h-4" />
-                                        </a>
+                                        <div className="flex-1 block">
+                                            <BubbleButton
+                                                onClick={() => handleUpvote(promo._id)}
+                                                active={promo.upvotes?.includes(userId)}
+                                                baseColor="bg-white/5"
+                                                activeColor="bg-emerald-500/20"
+                                                className={`rounded-xl border shadow-md w-full ${promo.upvotes?.includes(userId)
+                                                    ? 'border-emerald-500/40 text-emerald-400 shadow-emerald-900/20'
+                                                    : 'border-white/10 text-gray-400 hover:text-white'
+                                                    }`}
+                                            >
+                                                <ArrowUp className={`w-4 h-4 ${promo.upvotes?.includes(userId) ? 'stroke-[3px]' : ''}`} />
+                                                <span className="ml-1">{promo.upvotes?.length || 0} Upvotes</span>
+                                            </BubbleButton>
+                                        </div>
+                                        {promo.linkUrl && (
+                                            <a
+                                                href={promo.linkUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="block shrink-0"
+                                            >
+                                                <BubbleButton
+                                                    baseColor="bg-white/10"
+                                                    activeColor="bg-white/20"
+                                                    className="border border-white/10 px-6"
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </BubbleButton>
+                                            </a>
+                                        )}
                                     </div>
+                                    {promo.contactDetails && (
+                                        <div className="mt-4 pt-4 border-t border-white/5">
+                                            <p className="text-xs text-gray-500 font-medium mb-1">Contact:</p>
+                                            <p className="text-sm text-fuchsia-300 font-mono">{promo.contactDetails}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -320,12 +368,14 @@ export default function PromotionsPage() {
                                 <User className="w-12 h-12 text-gray-700 mx-auto mb-3" />
                                 <h3 className="font-semibold text-gray-300">No pitches yet</h3>
                                 <p className="text-sm text-gray-500 mt-1">Submit a pitch to see it tracked here.</p>
-                                <button
+                                <BubbleButton
                                     onClick={() => setActiveTab('submit')}
-                                    className="mt-4 px-6 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition"
+                                    baseColor="bg-white/10"
+                                    activeColor="bg-white/20"
+                                    className="mt-4 mx-auto w-fit text-sm"
                                 >
                                     Pitch an App
-                                </button>
+                                </BubbleButton>
                             </div>
                         )}
 
@@ -345,9 +395,12 @@ export default function PromotionsPage() {
                                 <div className="mt-auto flex justify-between items-center text-xs text-gray-500 border-t border-white/5 pt-3">
                                     <div className="flex items-center gap-3">
                                         <span>Submitted: {new Date(promo.createdAt).toLocaleDateString()}</span>
-                                        <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {promo.upvotes?.length || 0}</span>
+                                        <span className="flex items-center gap-1 font-semibold text-emerald-400"><ArrowUp className="w-3 h-3 stroke-[3px]" /> {promo.upvotes?.length || 0}</span>
                                     </div>
-                                    <span className="truncate max-w-[150px]">{promo.linkUrl}</span>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="truncate max-w-[150px] text-fuchsia-300/70">{promo.contactDetails}</span>
+                                        <span className="truncate max-w-[150px]">{promo.linkUrl}</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -412,9 +465,8 @@ export default function PromotionsPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Destination URL/Link *</label>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Destination URL/Link (Optional)</label>
                                         <input
-                                            required
                                             type="url"
                                             name="linkUrl"
                                             value={formData.linkUrl}
@@ -425,15 +477,45 @@ export default function PromotionsPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Banner Image URL (Optional)</label>
-                                        <input
-                                            type="url"
-                                            name="imageUrl"
-                                            value={formData.imageUrl}
-                                            onChange={handleFormChange}
-                                            placeholder="https://..."
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:bg-white/10 transition font-mono"
-                                        />
+                                        <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Banner Image (Optional)</label>
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                            <div className="flex-1 w-full">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleImageUpload}
+                                                    disabled={isUploadingImage}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-violet-500/10 file:text-violet-400 hover:file:bg-violet-500/20 disabled:opacity-50 transition"
+                                                />
+                                                {isUploadingImage && <p className="text-xs text-violet-400 mt-2 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Uploading image...</p>}
+                                                {formData.imageUrl && !isUploadingImage && <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Image uploaded successfully</p>}
+                                            </div>
+                                            {formData.imageUrl && !isUploadingImage && (
+                                                <div className="relative w-full sm:w-28 h-28 rounded-xl overflow-hidden border border-white/20 shrink-0 bg-black/40 shadow-inner group flex items-center justify-center">
+                                                    <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await fetch(`${API_BASE}/upload/image`, {
+                                                                    method: 'DELETE',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ imageUrl: formData.imageUrl })
+                                                                });
+                                                            } catch (err) {
+                                                                console.error("Failed to delete image:", err);
+                                                            } finally {
+                                                                setFormData(prev => ({ ...prev, imageUrl: '' }));
+                                                            }
+                                                        }}
+                                                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 hover:bg-red-500/80 text-white flex items-center justify-center transition-colors backdrop-blur-sm opacity-0 group-hover:opacity-100"
+                                                        title="Remove Image"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div>
@@ -444,10 +526,23 @@ export default function PromotionsPage() {
                                             name="submittedBy"
                                             value={formData.submittedBy}
                                             onChange={handleFormChange}
-                                            placeholder="e.g. John Doe (1234567)"
+                                            placeholder="e.g. Dilip (1234567)"
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:bg-white/10 transition"
                                         />
                                         <p className="text-[10px] text-gray-600 mt-1.5 ml-1">Your identity will be visible to the Admin.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1.5 ml-1">Contact Details (Optional)</label>
+                                        <input
+                                            type="text"
+                                            name="contactDetails"
+                                            value={formData.contactDetails}
+                                            onChange={handleFormChange}
+                                            placeholder="Email, WhatsApp, or Twitter..."
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 focus:bg-white/10 transition"
+                                        />
+                                        <p className="text-[10px] text-gray-600 mt-1.5 ml-1">How can people reach out to you about this pitch?</p>
                                     </div>
                                 </div>
 
