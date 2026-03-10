@@ -16,9 +16,9 @@ export default function PromotionsPage() {
 
     useEffect(() => {
         let uid = localStorage.getItem('studentRoll');
-        if (!uid) {
+        if (!uid || uid === 'undefined' || uid === 'null') {
             uid = localStorage.getItem('shadow_device_id');
-            if (!uid) {
+            if (!uid || uid === 'undefined' || uid === 'null') {
                 uid = 'anon_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
                 localStorage.setItem('shadow_device_id', uid);
             }
@@ -65,7 +65,30 @@ export default function PromotionsPage() {
             const res = await fetch(`${API_BASE}/promotions/active`);
             if (!res.ok) throw new Error('Failed to load promotions');
             const data = await res.json();
-            setPromotions(data.data || []);
+            const promos = data.data || [];
+
+            // Record views for all fetched promotions
+            if (promos.length > 0) {
+                // Ensure userId is resolved; but we can just use localStorage directly if state is not set
+                let currentUid = userId;
+                if (!currentUid || currentUid === 'undefined' || currentUid === 'null') {
+                    currentUid = localStorage.getItem('studentRoll');
+                    if (!currentUid || currentUid === 'undefined' || currentUid === 'null') {
+                        currentUid = localStorage.getItem('shadow_device_id');
+                    }
+                }
+
+                if (currentUid && currentUid !== 'undefined' && currentUid !== 'null') {
+                    const promoIds = promos.map(p => p._id);
+                    fetch(`${API_BASE}/promotions/views`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ promoIds, userId: currentUid })
+                    }).catch(err => console.error('Failed to record views', err));
+                }
+            }
+
+            setPromotions(promos);
         } catch (err) {
             setError(err.message || 'Error loading data');
         } finally {
@@ -293,7 +316,14 @@ export default function PromotionsPage() {
                                         <h2 className="font-bold text-xl text-white tracking-wide">
                                             {promo.title}
                                         </h2>
-                                        <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/5 px-2.5 py-1 rounded-md text-gray-400 border border-white/10 shrink-0">By {promo.submittedBy}</span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/5 px-2.5 py-1 rounded-md text-gray-400 border border-white/10 shrink-0">By {promo.submittedBy}</span>
+                                            {promo.views && promo.views.length > 0 && (
+                                                <span className="text-[10px] flex items-center gap-1 text-gray-500 font-medium whitespace-nowrap">
+                                                    <User className="w-3 h-3" /> {promo.views.length} {promo.views.length === 1 ? 'view' : 'views'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <p className={`text-sm leading-relaxed mb-6 ${promo.imageUrl ? 'text-gray-300' : 'text-gray-400'}`}>
                                         {promo.description}
@@ -395,7 +425,12 @@ export default function PromotionsPage() {
                                 <div className="mt-auto flex justify-between items-center text-xs text-gray-500 border-t border-white/5 pt-3">
                                     <div className="flex items-center gap-3">
                                         <span>Submitted: {new Date(promo.createdAt).toLocaleDateString()}</span>
-                                        <span className="flex items-center gap-1 font-semibold text-emerald-400"><ArrowUp className="w-3 h-3 stroke-[3px]" /> {promo.upvotes?.length || 0}</span>
+                                        <span className="flex items-center gap-1 font-semibold text-emerald-400" title="Upvotes">
+                                            <ArrowUp className="w-3 h-3 stroke-[3px]" /> {promo.upvotes?.length || 0}
+                                        </span>
+                                        <span className="flex items-center gap-1 font-semibold text-violet-400" title="Views">
+                                            <User className="w-3 h-3" /> {promo.views?.length || 0}
+                                        </span>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
                                         <span className="truncate max-w-[150px] text-fuchsia-300/70">{promo.contactDetails}</span>
