@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Megaphone, PlusCircle, ArrowLeft,
-    ExternalLink, CheckCircle, AlertTriangle, Loader2, User, ArrowUp
+    ExternalLink, CheckCircle, AlertTriangle, Loader2, User, ArrowUp, MousePointerClick
 } from 'lucide-react';
 import BubbleButton from '../components/BubbleButton';
 
@@ -152,6 +152,36 @@ export default function PromotionsPage() {
         } catch (err) {
             console.error('Failed to toggle upvote', err);
         }
+    };
+
+    const handleLinkClick = async (promoId, linkUrl) => {
+        if (!userId) return;
+
+        // Optimistically update clicks in UI
+        const updateArray = (prev) => prev.map(p => {
+            if (p._id === promoId) {
+                const newClicks = p.clicks && p.clicks.includes(userId)
+                    ? p.clicks
+                    : [...(p.clicks || []), userId];
+                return { ...p, clicks: newClicks };
+            }
+            return p;
+        });
+
+        setPromotions(updateArray);
+        setMyPitches(updateArray);
+
+        try {
+            await fetch(`${API_BASE}/promotions/${promoId}/click`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+        } catch (err) {
+            console.error('Failed to record click', err);
+        }
+
+        // Let the default anchor behavior open the link in a new tab
     };
 
     const handleFormChange = (e) => {
@@ -305,43 +335,55 @@ export default function PromotionsPage() {
                         )}
 
                         {!loadingPromotions && promotions.map(promo => (
-                            <div key={promo._id} className="group flex flex-col relative rounded-2xl border border-white/10 bg-[#0f0f13] overflow-hidden hover:border-white/20 transition-all duration-500 shadow-2xl shadow-black/80">
+                            <div key={promo._id} className="group flex flex-col relative rounded-3xl border border-white/[0.08] bg-[#0c0c0e]/80 backdrop-blur-xl overflow-hidden hover:border-white/[0.15] hover:bg-[#121215]/90 transition-all duration-500 shadow-xl hover:shadow-2xl hover:shadow-violet-900/10">
                                 {promo.imageUrl && (
-                                    <div className="w-full h-56 bg-zinc-900 overflow-hidden shrink-0">
+                                    <div className="w-full h-64 bg-zinc-900 overflow-hidden shrink-0 relative">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0e]/90 via-transparent to-transparent z-10 pointer-events-none"></div>
                                         <img src={promo.imageUrl} alt={promo.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                                     </div>
                                 )}
                                 <div className="p-6 relative z-20 flex flex-col flex-1">
-                                    <div className="flex justify-between items-start mb-3 gap-4">
-                                        <h2 className="font-bold text-xl text-white tracking-wide">
+                                    <div className="flex justify-between items-start mb-4 gap-4">
+                                        <h2 className="font-bold text-2xl text-white tracking-tight leading-tight">
                                             {promo.title}
                                         </h2>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/5 px-2.5 py-1 rounded-md text-gray-400 border border-white/10 shrink-0">By {promo.submittedBy}</span>
-                                            {promo.views && promo.views.length > 0 && (
-                                                <span className="text-[10px] flex items-center gap-1 text-gray-500 font-medium whitespace-nowrap">
-                                                    <User className="w-3 h-3" /> {promo.views.length} {promo.views.length === 1 ? 'view' : 'views'}
+                                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                            <div className="flex items-center gap-2 bg-white/[0.06] backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full shadow-sm">
+                                                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0">
+                                                    <span className="text-[8px] font-bold text-white">{promo.submittedBy.charAt(0).toUpperCase()}</span>
+                                                </div>
+                                                <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-300 truncate max-w-[100px]">{promo.submittedBy}</span>
+                                            </div>
+                                            {(promo.views && promo.views.length > 0) ? (
+                                                <span className="text-[11px] flex items-center gap-1.5 text-gray-400 font-medium whitespace-nowrap px-1">
+                                                    <User className="w-3.5 h-3.5" /> {promo.views.length} {promo.views.length === 1 ? 'view' : 'views'}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11px] flex items-center gap-1.5 text-gray-500 font-medium whitespace-nowrap px-1">
+                                                    <User className="w-3.5 h-3.5" /> 0 views
                                                 </span>
                                             )}
                                         </div>
                                     </div>
-                                    <p className={`text-sm leading-relaxed mb-6 ${promo.imageUrl ? 'text-gray-300' : 'text-gray-400'}`}>
+
+                                    <p className={`text-sm leading-relaxed mb-6 flex-1 ${promo.imageUrl ? 'text-gray-300/90' : 'text-gray-400'}`}>
                                         {promo.description}
                                     </p>
-                                    <div className="flex items-center gap-3">
+
+                                    <div className="flex items-center gap-3 mt-auto">
                                         <div className="flex-1 block">
                                             <BubbleButton
                                                 onClick={() => handleUpvote(promo._id)}
                                                 active={promo.upvotes?.includes(userId)}
                                                 baseColor="bg-white/5"
-                                                activeColor="bg-emerald-500/20"
-                                                className={`rounded-xl border shadow-md w-full ${promo.upvotes?.includes(userId)
-                                                    ? 'border-emerald-500/40 text-emerald-400 shadow-emerald-900/20'
-                                                    : 'border-white/10 text-gray-400 hover:text-white'
+                                                activeColor="bg-emerald-500/10"
+                                                className={`rounded-2xl border shadow-sm w-full py-3.5 flex items-center justify-center gap-2 transition-all duration-300 ${promo.upvotes?.includes(userId)
+                                                    ? 'border-emerald-500/30 text-emerald-400 shadow-emerald-900/20 bg-emerald-500/10'
+                                                    : 'border-white/10 text-gray-300 hover:text-white hover:bg-white/10'
                                                     }`}
                                             >
-                                                <ArrowUp className={`w-4 h-4 ${promo.upvotes?.includes(userId) ? 'stroke-[3px]' : ''}`} />
-                                                <span className="ml-1">{promo.upvotes?.length || 0} Upvotes</span>
+                                                <ArrowUp className={`w-5 h-5 ${promo.upvotes?.includes(userId) ? 'stroke-[3px]' : ''}`} />
+                                                <span className="font-semibold text-sm">{promo.upvotes?.length || 0} Upvotes</span>
                                             </BubbleButton>
                                         </div>
                                         {promo.linkUrl && (
@@ -350,23 +392,38 @@ export default function PromotionsPage() {
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="block shrink-0"
+                                                onClick={() => handleLinkClick(promo._id, promo.linkUrl)}
                                             >
                                                 <BubbleButton
-                                                    baseColor="bg-white/10"
-                                                    activeColor="bg-white/20"
-                                                    className="border border-white/10 px-6"
+                                                    baseColor="bg-white/5"
+                                                    activeColor="bg-white/10"
+                                                    className="border border-white/10 px-6 py-3.5 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all duration-300 flex items-center justify-center shadow-sm"
+                                                    title="Visit Link"
                                                 >
-                                                    <ExternalLink className="w-4 h-4" />
+                                                    <ExternalLink className="w-5 h-5 text-gray-300" />
                                                 </BubbleButton>
                                             </a>
                                         )}
                                     </div>
-                                    {promo.contactDetails && (
-                                        <div className="mt-4 pt-4 border-t border-white/5">
-                                            <p className="text-xs text-gray-500 font-medium mb-1">Contact:</p>
-                                            <p className="text-sm text-fuchsia-300 font-mono">{promo.contactDetails}</p>
+
+                                    {/* Stats & Contacts Footer layout */}
+                                    <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-between">
+                                        {/* Click statistics if present */}
+                                        <div className="flex items-center gap-4">
+                                            {promo.clicks && promo.clicks.length > 0 && (
+                                                <span className="flex items-center gap-1.5 text-xs text-blue-400 font-medium bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">
+                                                    <MousePointerClick className="w-3.5 h-3.5" /> {promo.clicks.length} {promo.clicks.length === 1 ? 'click' : 'clicks'}
+                                                </span>
+                                            )}
                                         </div>
-                                    )}
+
+                                        {promo.contactDetails && (
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500 font-medium mb-0.5">Contact</p>
+                                                <p className="text-sm text-fuchsia-300 font-mono">{promo.contactDetails}</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -430,6 +487,9 @@ export default function PromotionsPage() {
                                         </span>
                                         <span className="flex items-center gap-1 font-semibold text-violet-400" title="Views">
                                             <User className="w-3 h-3" /> {promo.views?.length || 0}
+                                        </span>
+                                        <span className="flex items-center gap-1 font-semibold text-blue-400" title="Clicks">
+                                            <MousePointerClick className="w-3 h-3" /> {promo.clicks?.length || 0}
                                         </span>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
