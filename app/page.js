@@ -17,6 +17,7 @@ export default function Home() {
     const notify = useNotification();
     const [className, setClassName] = useState('');
     const [rollNumber, setRollNumber] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     const [sessionChecked, setSessionChecked] = useState(false);
@@ -88,7 +89,8 @@ export default function Home() {
         try {
             const res = await api.post('/student/access', {
                 className: className.trim(),
-                rollNumber: String(rollNumber).trim()
+                rollNumber: String(rollNumber).trim(),
+                password: password.trim()
             });
 
             const classId = res.data.classId;
@@ -196,14 +198,24 @@ export default function Home() {
                             <input
                                 id="student-roll-number"
                                 type="text"
-                                className="input mb-5"
+                                className="input mb-3"
                                 placeholder="Roll Number"
                                 value={rollNumber}
                                 onChange={(e) => setRollNumber(e.target.value)}
                                 required
                             />
 
-                            <button id="student-login-btn" type="submit" className="btn btn-primary" disabled={loading}>
+                            <input
+                                id="student-password"
+                                type="password"
+                                className="input mb-5"
+                                placeholder="Password (Default: shadow123)"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+
+                            <button id="student-login-btn" type="submit" className="btn btn-primary mt-2" disabled={loading}>
                                 {loading ? (
                                     <span className="flex items-center gap-2">
                                         <span className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></span>
@@ -216,6 +228,12 @@ export default function Home() {
                                     </span>
                                 )}
                             </button>
+
+                            <div className="mt-4 text-center">
+                                <a href="/forgot-password" className="text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors">
+                                    Forgot Password?
+                                </a>
+                            </div>
                         </form>
                     </div>
                 )}

@@ -7,8 +7,9 @@ import api from '@/utils/api';
 import {
     LayoutDashboard, Calendar, FileText,
     LogOut, Zap, BookOpen, Flag, Menu, X,
-    HelpCircle, Calculator, Megaphone
+    HelpCircle, Calculator, Megaphone, User
 } from 'lucide-react';
+import ProfileSetupPrompt from './ProfileSetupPrompt';
 
 // ── Spear SVG for Attention ─────────────────────────────────────────────────
 function SpearIcon({ className }) {
@@ -239,9 +240,13 @@ export default function Navbar({ isAdmin = false, isStudent = false, onLogout, o
                     <DrawerLink href={`/student/${classId}/${rollNumber}/bunk-effect`} icon={Zap} label="Skip Effect" />
                     {onReportClick && <DrawerButton onClick={onReportClick} icon={Flag} label="Report Issue" />}
                     <div className="border-t border-white/6 my-2" />
+                    <DrawerLink href={`/student/${classId}/${rollNumber}/profile`} icon={User} label="My Profile" />
                     <DrawerLink href="/guide" icon={HelpCircle} label="Guide" />
                     <DrawerButton onClick={onLogout} icon={LogOut} label="Logout" danger />
                 </Drawer>
+
+                {/* Secure Setup Prompt runs automatically on all student pages */}
+                <ProfileSetupPrompt classId={classId} rollNumber={rollNumber} />
             </>
         );
     }
