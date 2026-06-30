@@ -5,9 +5,9 @@ import {
     ArrowLeft, Loader2, BookOpen, Shield, Eye, EyeOff, ArrowRight,
     Hash, ListChecks
 } from 'lucide-react';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useNotification } from '@/app/components/Notification';
+import { useNotification } from '@/components/Notification';
 
 const sanitizeCustomRollNumbers = (input) => {
     const parts = String(input || '')

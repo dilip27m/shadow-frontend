@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Edit2, Trash2 } from 'lucide-react';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useNotification } from '@/app/components/Notification';
-import { useConfirm } from '@/app/components/ConfirmDialog';
+import { useNotification } from '@/components/Notification';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 export default function AdminAttention() {
     const router = useRouter();

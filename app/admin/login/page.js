@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useNotification } from '@/app/components/Notification';
+import { useNotification } from '@/components/Notification';
 
 export default function AdminLogin() {
     const router = useRouter();

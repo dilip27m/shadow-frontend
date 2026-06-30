@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Navbar from '@/app/components/Navbar';
-import NotificationSetup from '@/app/components/NotificationSetup';
+import Navbar from '@/components/Navbar';
+import NotificationSetup from '@/components/NotificationSetup';
 import api from '@/utils/api';
-import Calendar from '@/app/components/Calendar';
+import Calendar from '@/components/Calendar';
 import useSWR from 'swr';
 
 export default function StudentAttention() {

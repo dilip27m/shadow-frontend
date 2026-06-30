@@ -7,11 +7,11 @@ import {
     AlertTriangle, Loader2, Camera, Lock, LockOpen,
     ZoomIn, ZoomOut, Move, Crop as CropIcon, RefreshCw, Smartphone, Shield
 } from 'lucide-react';
-import Navbar from '@/app/components/Navbar';
-import Calendar from '@/app/components/Calendar';
+import Navbar from '@/components/Navbar';
+import Calendar from '@/components/Calendar';
 import api from '@/utils/api';
-import { useConfirm } from '@/app/components/ConfirmDialog';
-import { useNotification } from '@/app/components/Notification';
+import { useConfirm } from '@/components/ConfirmDialog';
+import { useNotification } from '@/components/Notification';
 import Cropper from "react-cropper";
 import "cropperjs/dist/cropper.css";
 const sanitizeRollNumber = (value) => {

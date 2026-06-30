@@ -6,7 +6,7 @@ let globalShowConfirm = null;
 /**
  * Custom styled confirm dialog to replace native browser confirm().
  * Usage:
- *   import { ConfirmProvider, useConfirm } from '@/app/components/ConfirmDialog';
+ *   import { ConfirmProvider, useConfirm } from '@/components/ConfirmDialog';
  *   // Wrap your page with <ConfirmProvider>
  *   const confirm = useConfirm();
  *   const ok = await confirm('Are you sure?', 'This action cannot be undone.');

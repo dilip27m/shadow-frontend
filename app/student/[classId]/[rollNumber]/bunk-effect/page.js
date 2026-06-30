@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useNotification } from '@/app/components/Notification';
+import { useNotification } from '@/components/Notification';
 import useSWR from 'swr';
 
 export default function BunkEffect() {

@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Edit2, Trash2, Plus, BookOpen, X, Check } from 'lucide-react';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useConfirm } from '@/app/components/ConfirmDialog';
-import { useNotification } from '@/app/components/Notification';
+import { useConfirm } from '@/components/ConfirmDialog';
+import { useNotification } from '@/components/Notification';
 
 export default function SubjectManager() {
     const router = useRouter();

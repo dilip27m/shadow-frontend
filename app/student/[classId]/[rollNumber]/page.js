@@ -2,10 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useConfirm } from '@/app/components/ConfirmDialog';
-import { useNotification } from '@/app/components/Notification';
+import { useConfirm } from '@/components/ConfirmDialog';
+import { useNotification } from '@/components/Notification';
 import useSWR, { mutate } from 'swr';
 
 export default function StudentDashboard() {

@@ -6,9 +6,9 @@ import {
     GraduationCap, School, ChevronRight,
     ArrowRight
 } from 'lucide-react';
-import Navbar from './components/Navbar';
+import Navbar from '@/components/Navbar';
 import api from '@/utils/api';
-import { useNotification } from './components/Notification';
+import { useNotification } from '@/components/Notification';
 
 
 

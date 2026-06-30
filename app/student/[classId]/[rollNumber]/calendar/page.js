@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Navbar from '@/app/components/Navbar';
-import Calendar from '@/app/components/Calendar';
+import Navbar from '@/components/Navbar';
+import Calendar from '@/components/Calendar';
 import api from '@/utils/api';
 import useSWR from 'swr';
 

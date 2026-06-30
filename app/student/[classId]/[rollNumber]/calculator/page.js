@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Navbar from '@/app/components/Navbar';
+import Navbar from '@/components/Navbar';
 import {
     Plus, Trash2, Calculator, TrendingUp,
     RotateCcw, Percent, BookOpen, GraduationCap,

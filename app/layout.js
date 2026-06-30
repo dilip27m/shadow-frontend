@@ -2,8 +2,8 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
-import NotificationProvider from './components/Notification';
-import { ConfirmProvider } from './components/ConfirmDialog';
+import NotificationProvider from '@/components/Notification';
+import { ConfirmProvider } from '@/components/ConfirmDialog';
 
 const inter = Inter({
   subsets: ['latin'],
